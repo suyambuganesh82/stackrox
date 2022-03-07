@@ -492,6 +492,9 @@ parameters:
     type: string
     # Caution when editing: make sure groups would correspond to BASH_REMATCH use.
     default: '^([[:digit:]]+(\.[[:digit:]]+)*)(-rc\.[[:digit:]]+)?$'
+  tag:
+    type: string
+    default: ""
 
 orbs:
   win: circleci/windows@2.2.0
@@ -4421,6 +4424,27 @@ jobs:
   # Infrastructure and workflow utility jobs
   ###
 
+  setup-from-triggered-e2e-test:
+    executor: custom
+    resource_class: small
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Take build tag from GHA
+          command: |
+            echo "<< pipeline.parameters.tag >>" | tee CI_TAG
+      - run:
+          name: Get binaries for test from the image
+          command: |
+            source scripts/ci/lib.sh
+            setup_bin_from_image
+      - persist_to_workspace:
+          root: /go/src/github.com/stackrox/rox
+          paths:
+            - CI_TAG
+            - bin/linux
+
   retrigger-master-workflow:
     executor: custom
     resource_class: small
@@ -4649,9 +4673,9 @@ jobs:
 workflows:
   version: 2
 
-  build_all:
+  initial:
     when:
-      not: << pipeline.parameters.trigger_on_demand >>
+      not: << pipeline.parameters.workflow_name >>
     jobs:
       - slack-notify:
           filters:
@@ -4716,127 +4740,6 @@ workflows:
           <<: *runOnAllTagsWithPushCtx
       - build-scale-monitoring-and-mock-server:
           <<: *runOnAllTagsWithPushCtx
-      - provision-gke-api-nongroovy-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-api-nongroovy-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-api-nongroovy-tests
-      - local-roxctl-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - pre-build-cli
-      - provision-gke-ui-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-ui-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-ui-e2e-tests
-      - provision-gke-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-api-e2e-tests
-      - provision-gke-postgres-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-postgres-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-postgres-api-e2e-tests
-      - provision-gke-kernel-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-kernel-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-kernel-api-e2e-tests
-      - provision-gke-api-upgrade-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-api-upgrade-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - provision-gke-api-upgrade-tests
-      - provision-gke-api-scale-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-api-scale-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-gke-api-scale-tests
-      - provision-gke-postgres-api-scale-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-postgres-api-scale-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-          - build-stackrox
-          - build-rhacs
-          - build-scale-monitoring-and-mock-server
-          - provision-gke-postgres-api-scale-tests
-      - provision-openshift-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - openshift-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-openshift-api-e2e-tests
-      - provision-openshift-crio-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - openshift-crio-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-openshift-crio-api-e2e-tests
-      - provision-eks-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - eks-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-eks-api-e2e-tests
-      # ROX-8306 - Disabled due to Azure account issue
-      # - provision-aks-api-e2e-tests:
-      #     <<: *runOnAllTagsWithQuayIOPullCtx
-      # - aks-api-e2e-tests:
-      #     <<: *runOnAllTagsWithQuayIOPullCtx
-      #     requires:
-      #       - build-stackrox
-      #       - build-rhacs
-      #       - build-scale-monitoring-and-mock-server
-      #       - provision-aks-api-e2e-tests
-      - provision-openshift-4-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-      - openshift-4-api-e2e-tests:
-          <<: *runOnAllTagsWithQuayIOPullCtx
-          requires:
-            - build-stackrox
-            - build-rhacs
-            - build-scale-monitoring-and-mock-server
-            - provision-openshift-4-api-e2e-tests
       - provision-openshift-4-operator-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
       - provision-openshift-4-6-operator-e2e-tests:
@@ -4844,15 +4747,15 @@ workflows:
       - openshift-4-operator-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
-            - build-stackrox
-            - build-rhacs
+            # - build-stackrox
+            # - build-rhacs
             - build-operator
             - provision-openshift-4-operator-e2e-tests
       - openshift-4-6-operator-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
-            - build-stackrox
-            - build-rhacs
+            # - build-stackrox
+            # - build-rhacs
             - build-operator
             - provision-openshift-4-6-operator-e2e-tests
       - provision-race-condition-tests:
@@ -4867,16 +4770,141 @@ workflows:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
             - pre-build-cli
-      - mark-collector-release:
-          <<: *runOnlyOnReleaseBuilds
-          context:
-            - custom-executor-pull
+      - local-roxctl-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
-            - build-stackrox
-            - build-rhacs
-            - go-unit-tests
-            - ui-unit-tests
-            - push-release
+            - pre-build-cli
+      - check-docs-job:
+          <<: *runOnlyOnReleaseCandidateBuilds
+          context:
+          - custom-executor-pull
+      - check-scanner-and-collector-release-job:
+          <<: *runOnlyOnReleaseCandidateBuilds
+          context:
+          - custom-executor-pull
+
+  # To trigger e2e tests:
+  #
+  #   curl -X POST --header 'Content-Type: application/json' \
+  #        --header "Circle-Token: <your CI token>" https://circleci.com/api/v2/project/github/stackrox/stackrox/pipeline -d '{
+  #     "branch": "<your branch>",
+  #     "parameters": {
+  #         "trigger_on_demand": true,
+  #         "workflow_name": "e2e-tests",
+  #         "tag": "<tag to test>"
+  #     }
+  # }'
+
+  e2e_tests:
+    when:
+      equal: [ "e2e-tests", << pipeline.parameters.workflow_name >> ]
+    jobs:
+      - setup-from-triggered-e2e-test:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - provision-gke-api-nongroovy-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-api-nongroovy-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-api-nongroovy-tests
+      - provision-gke-ui-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-ui-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-ui-e2e-tests
+      - provision-gke-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-api-e2e-tests
+      - provision-gke-postgres-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-postgres-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-postgres-api-e2e-tests
+      - provision-gke-kernel-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-kernel-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-kernel-api-e2e-tests
+      - provision-gke-api-upgrade-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-api-upgrade-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            - provision-gke-api-upgrade-tests
+      - provision-gke-api-scale-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-api-scale-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-api-scale-tests
+      - provision-gke-postgres-api-scale-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-postgres-api-scale-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-gke-postgres-api-scale-tests
+      - provision-openshift-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - openshift-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-openshift-api-e2e-tests
+      - provision-openshift-crio-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - openshift-crio-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-openshift-crio-api-e2e-tests
+      - provision-eks-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - eks-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-eks-api-e2e-tests
+      # ROX-8306 - Disabled due to Azure account issue
+      # - provision-aks-api-e2e-tests:
+      #     <<: *runOnAllTagsWithQuayIOPullCtx
+      # - aks-api-e2e-tests:
+      #     <<: *runOnAllTagsWithQuayIOPullCtx
+      #     requires:
+      #       - build
+      #        # - build-scale-monitoring-and-mock-server
+      #       - provision-aks-api-e2e-tests
+      - provision-openshift-4-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - openshift-4-api-e2e-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
+            - provision-openshift-4-api-e2e-tests
 
       - provision-openshift-rosa-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
@@ -4888,23 +4916,13 @@ workflows:
       - openshift-rosa-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
-            - build-scale-monitoring-and-mock-server
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
             - provision-openshift-rosa-api-e2e-tests
-            - build-stackrox
-            - build-rhacs
           context:
             - com-redhat-cloud
             - quay-rhacs-eng-readonly
             - aws-setup
-
-      - check-docs-job:
-          <<: *runOnlyOnReleaseCandidateBuilds
-          context:
-          - custom-executor-pull
-      - check-scanner-and-collector-release-job:
-          <<: *runOnlyOnReleaseCandidateBuilds
-          context:
-          - custom-executor-pull
 
       - provision-openshift-aro-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
@@ -4917,14 +4935,19 @@ workflows:
       - openshift-aro-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
-            - build-scale-monitoring-and-mock-server
+            - setup-from-triggered-e2e-test
+            # - build-scale-monitoring-and-mock-server
             - provision-openshift-aro-api-e2e-tests
-            - build-rhacs
           context:
             - com-redhat-cloud
             - quay-rhacs-eng-readonly
             - azure-ci
             - aro-cluster-manager
+
+      - go-unit-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - ui-unit-tests:
+          <<: *runOnAllTagsWithQuayIOPullCtx
 
       - push-release:
           <<: *runOnlyOnReleaseBuilds
@@ -4932,10 +4955,16 @@ workflows:
             - custom-executor-pull
             - docker-io-and-stackrox-io-push
           requires:
-            - build-stackrox
-            - build-rhacs
+            - setup-from-triggered-e2e-test
             - go-unit-tests
             - ui-unit-tests
+
+      - mark-collector-release:
+          <<: *runOnlyOnReleaseBuilds
+          context:
+            - custom-executor-pull
+          requires:
+            - push-release
 
       - scan-images-in-quay:
           context:
@@ -4946,8 +4975,7 @@ workflows:
             branches:
               ignore: /.*/
           requires:
-            - build-stackrox
-            - build-rhacs
+            - setup-from-triggered-e2e-test
 
       - openshift-ci-upgrade-test:
           context:
@@ -4956,8 +4984,7 @@ workflows:
             branches:
               only: /.*(osci).*/
           requires:
-            - build-stackrox
-            - build-rhacs
+            - setup-from-triggered-e2e-test
 
       - retrigger-master-workflow:
           context: custom-executor-pull
