@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	ecrRegistryRegex = regexp.MustCompile(`\d+\.dkr\.ecr\.[^.]+\.amazonaws\.com`)
+	ecrRegistryRegex = regexp.MustCompile(`(\d+)\.dkr\.ecr\.([^.]+)\.amazonaws\.com`)
 	log              = logging.LoggerForModule()
 )
 
@@ -103,10 +103,21 @@ func (m *ecrCredentialsManager) Stop() {
 }
 
 func (m *ecrCredentialsManager) GetDockerConfigEntry(registry string) *config.DockerConfigEntry {
-	if !ecrRegistryRegex.MatchString(registry) {
+	if _, _, ok := FindECRURLAccountAndRegion(registry); !ok {
 		return nil
 	}
 	return m.getConfigIfValid()
+}
+
+// FindECRURLAccountAndRegion returns the account and region ECR registry
+// URL, if it's not a valid ECR registry URL returns nils and false.
+func FindECRURLAccountAndRegion(registry string) (account, region string, ok bool) {
+	match := ecrRegistryRegex.FindStringSubmatch(registry)
+	if match != nil {
+		account, region = match[1], match[2]
+		ok = true
+	}
+	return
 }
 
 // refreshAuthToken Contact AWS ECR to get a new auth token.
