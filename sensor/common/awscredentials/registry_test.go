@@ -86,3 +86,53 @@ func Test_ecrCredentialsManager_GetDockerConfigEntry(t *testing.T) {
 		})
 	}
 }
+
+func TestFindECRURLAccountAndRegion(t *testing.T) {
+	type args struct {
+		registry string
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantAccount string
+		wantRegion  string
+		wantOk      bool
+	}{
+		{
+			name:        "Valid ECR URL",
+			args:        args{"1234.dkr.ecr.foo-bar.amazonaws.com"},
+			wantAccount: "1234",
+			wantRegion:  "foo-bar",
+			wantOk:      true,
+		},
+		{
+			name:   "Invalid ECR URL, missing account",
+			args:   args{"dkr.ecr.foo-bar.amazonaws.com"},
+			wantOk: false,
+		},
+		{
+			name:   "Invalid ECR URL, missing region",
+			args:   args{"1234.dkr.ecr.amazonaws.com"},
+			wantOk: false,
+		},
+		{
+			name:   "Invalid ECR URL, bad account",
+			args:   args{"foobar.dkr.ecr.foo-bar-1.amazonaws.com"},
+			wantOk: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotAccount, gotRegion, gotOk := findECRURLAccountAndRegion(tt.args.registry)
+			if gotAccount != tt.wantAccount {
+				t.Errorf("findECRURLAccountAndRegion() gotAccount = %v, want %v", gotAccount, tt.wantAccount)
+			}
+			if gotRegion != tt.wantRegion {
+				t.Errorf("findECRURLAccountAndRegion() gotRegion = %v, want %v", gotRegion, tt.wantRegion)
+			}
+			if gotOk != tt.wantOk {
+				t.Errorf("findECRURLAccountAndRegion() gotOk = %v, want %v", gotOk, tt.wantOk)
+			}
+		})
+	}
+}

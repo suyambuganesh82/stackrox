@@ -23,12 +23,21 @@ var (
 	log              = logging.LoggerForModule()
 )
 
+// RegistryCredentials carries credential information to access AWS-based
+// registries.
+type RegistryCredentials struct {
+	AWSAccount   string
+	AWSRegion    string
+	DockerConfig *config.DockerConfigEntry
+	ExpirestAt   time.Time
+}
+
 // RegistryCredentialsManager is a sensor component that manages
 // credentials for docker registries.
 type RegistryCredentialsManager interface {
-	// GetDockerConfigEntry returns the most recent docker config credential for the given
+	// GetDockerConfigEntry returns the most recent registry credential for the given
 	// registry URI, or `nil` if not available.
-	GetDockerConfigEntry(r string) *config.DockerConfigEntry
+	GetDockerConfigEntry(r string) *RegistryCredentials
 	Start()
 	Stop()
 }
@@ -102,16 +111,27 @@ func (m *ecrCredentialsManager) Stop() {
 	m.stopSignal.Signal()
 }
 
-func (m *ecrCredentialsManager) GetDockerConfigEntry(registry string) *config.DockerConfigEntry {
-	if _, _, ok := FindECRURLAccountAndRegion(registry); !ok {
+func (m *ecrCredentialsManager) GetDockerConfigEntry(registry string) *RegistryCredentials {
+	acc, reg, ok := findECRURLAccountAndRegion(registry)
+	if !ok {
+		// Invalid ECR registry URL, so credentials are not available.
 		return nil
 	}
-	return m.getConfigIfValid()
+	cfg := m.getConfigIfValid()
+	if cfg == nil {
+		return nil
+	}
+	return &RegistryCredentials{
+		AWSAccount:   acc,
+		AWSRegion:    reg,
+		DockerConfig: cfg,
+		ExpirestAt:   m.expiresAt,
+	}
 }
 
-// FindECRURLAccountAndRegion returns the account and region ECR registry
+// findECRURLAccountAndRegion returns the account and region ECR registry
 // URL, if it's not a valid ECR registry URL returns nils and false.
-func FindECRURLAccountAndRegion(registry string) (account, region string, ok bool) {
+func findECRURLAccountAndRegion(registry string) (account, region string, ok bool) {
 	match := ecrRegistryRegex.FindStringSubmatch(registry)
 	if match != nil {
 		account, region = match[1], match[2]
