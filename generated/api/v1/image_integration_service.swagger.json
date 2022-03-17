@@ -286,7 +286,10 @@
     "ECRConfigAuthorizationData": {
       "type": "object",
       "properties": {
-        "authorizationToken": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
           "type": "string"
         },
         "expiresAt": {
