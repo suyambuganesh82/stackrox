@@ -157,7 +157,25 @@ func newRegistry(integration *storage.ImageIntegration) (*ecr, error) {
 	if err := validate(conf); err != nil {
 		return nil, err
 	}
+	reg := &ecr{
+		config:      conf,
+		integration: integration,
+		// docker endpoint
+		endpoint: fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com", conf.GetRegistryId(), conf.GetRegion()),
+	}
+	service, err := createECRClient(conf)
+	if err != nil {
+		return nil, err
+	}
+	reg.service = service
+	if err := reg.refreshDockerClient(); err != nil {
+		return nil, err
+	}
+	return reg, nil
+}
 
+// createECRClient creates an AWS ECR SDK client based on the integration config.
+func createECRClient(conf *storage.ECRConfig) (*awsECR.ECR, error) {
 	awsConfig := &aws.Config{
 		Region: aws.String(conf.GetRegion()),
 	}
@@ -197,16 +215,5 @@ func newRegistry(integration *storage.ImageIntegration) (*ecr, error) {
 	} else {
 		service = awsECR.New(sess)
 	}
-
-	reg := &ecr{
-		config:      conf,
-		integration: integration,
-		// docker endpoint
-		endpoint: fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com", conf.GetRegistryId(), conf.GetRegion()),
-		service:  service,
-	}
-	if err := reg.refreshDockerClient(); err != nil {
-		return nil, err
-	}
-	return reg, nil
+	return service, nil
 }
