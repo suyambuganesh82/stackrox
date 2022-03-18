@@ -40,24 +40,31 @@ func validate(ecr *storage.ECRConfig) error {
 	if ecr.GetRegistryId() == "" {
 		errorList.AddString("Registry ID must be specified")
 	}
-	if !ecr.GetUseIam() {
-		if ecr.GetAccessKeyId() == "" {
-			errorList.AddString("Access Key ID must be specified if not using IAM")
+	if ecr.GetAuthorizationData() != nil {
+		if ecr.GetAuthorizationData().GetUsername() == "" {
+			errorList.AddString("Username must be specified in authorization data.")
 		}
-		if ecr.GetSecretAccessKey() == "" {
-			errorList.AddString("Secret Access Key must be specified if not using IAM")
+		if ecr.GetAuthorizationData().GetPassword() == "" {
+			errorList.AddString("Password must be specified in authorization data.")
+		}
+	} else {
+		if !ecr.GetUseIam() {
+			if ecr.GetAccessKeyId() == "" {
+				errorList.AddString("Access Key ID must be specified if not using IAM")
+			}
+			if ecr.GetSecretAccessKey() == "" {
+				errorList.AddString("Secret Access Key must be specified if not using IAM")
+			}
+		}
+		if ecr.GetUseAssumeRole() {
+			if ecr.GetEndpoint() != "" {
+				errorList.AddString("AssumeRole cannot be done with an endpoint defined")
+			}
+			if ecr.GetAssumeRoleId() == "" {
+				errorList.AddString("AssumeRole ID must be set to use AssumeRole")
+			}
 		}
 	}
-
-	if ecr.GetUseAssumeRole() {
-		if ecr.GetEndpoint() != "" {
-			errorList.AddString("AssumeRole cannot be done with an endpoint defined")
-		}
-		if ecr.GetAssumeRoleId() == "" {
-			errorList.AddString("AssumeRole ID must be set to use AssumeRole")
-		}
-	}
-
 	if ecr.GetRegion() == "" {
 		errorList.AddString("Region must be specified")
 	}
