@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/errorhelpers"
+	"github.com/stackrox/rox/pkg/errox"
 	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/registries/docker"
 	"github.com/stackrox/rox/pkg/registries/types"
@@ -178,10 +179,10 @@ func newRegistry(integration *storage.ImageIntegration) (*ecr, error) {
 
 	if conf.GetUseAssumeRole() {
 		if endpoint != "" {
-			return nil, errorhelpers.NewErrInvalidArgs("AssumeRole and Endpoint cannot both be enabled")
+			return nil, errox.NewErrInvalidArgs("AssumeRole and Endpoint cannot both be enabled")
 		}
 		if conf.GetAssumeRoleId() == "" {
-			return nil, errorhelpers.NewErrInvalidArgs("AssumeRole ID is required to use AssumeRole")
+			return nil, errox.NewErrInvalidArgs("AssumeRole ID is required to use AssumeRole")
 		}
 
 		roleToAssumeArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", conf.RegistryId, conf.AssumeRoleId)
