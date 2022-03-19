@@ -210,7 +210,7 @@ func (d *deploymentHandler) appendIntegrationsOnCredentials(
 }
 
 func (d *deploymentHandler) getImageIntegrationEvent(registry string) *central.SensorEvent {
-	credentials := d.credentialsManager.GetDockerConfigEntry(registry)
+	credentials := d.credentialsManager.GetRegistryCredentials(registry)
 	if credentials == nil {
 		return nil
 	}

@@ -80,8 +80,8 @@ func Test_ecrCredentialsManager_GetDockerConfigEntry(t *testing.T) {
 				expiresAt:         tt.fields.expiresAt,
 				stopSignal:        tt.fields.stopSignal,
 			}
-			if got := m.GetDockerConfigEntry(tt.args.registry); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetDockerConfigEntry() = %v, want %v", got, tt.want)
+			if got := m.GetRegistryCredentials(tt.args.registry); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRegistryCredentials() = %v, want %v", got, tt.want)
 			}
 		})
 	}

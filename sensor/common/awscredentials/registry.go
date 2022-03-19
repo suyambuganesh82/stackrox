@@ -37,7 +37,7 @@ type RegistryCredentials struct {
 type RegistryCredentialsManager interface {
 	// GetDockerConfigEntry returns the most recent registry credential for the given
 	// registry URI, or `nil` if not available.
-	GetDockerConfigEntry(r string) *RegistryCredentials
+	GetRegistryCredentials(r string) *RegistryCredentials
 	Start()
 	Stop()
 }
@@ -111,7 +111,7 @@ func (m *ecrCredentialsManager) Stop() {
 	m.stopSignal.Signal()
 }
 
-func (m *ecrCredentialsManager) GetDockerConfigEntry(registry string) *RegistryCredentials {
+func (m *ecrCredentialsManager) GetRegistryCredentials(registry string) *RegistryCredentials {
 	acc, reg, ok := findECRURLAccountAndRegion(registry)
 	if !ok {
 		// Invalid ECR registry URL, so credentials are not available.
