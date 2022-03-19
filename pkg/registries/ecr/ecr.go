@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	awsECR "github.com/aws/aws-sdk-go/service/ecr"
+	protobuftypes "github.com/gogo/protobuf/types"
 	"github.com/heroku/docker-registry-client/registry"
 	"github.com/pkg/errors"
 	"github.com/stackrox/rox/generated/storage"
@@ -76,13 +77,18 @@ func (e *ecr) refreshDockerClient() error {
 	if e.expiryTime.After(time.Now()) {
 		return nil
 	}
+	if e.integration.GetEcr().GetAuthorizationData() != nil {
+		// This integration has static authorization data, and we never refresh the
+		// tokens in central, rather we wait for sensor to update them.
+		return errors.Errorf("failed to refresh the auto-generated integration credentials")
+	}
 	authToken, err := e.service.GetAuthorizationToken(&awsECR.GetAuthorizationTokenInput{})
 	if err != nil {
 		return err
 	}
 
 	if len(authToken.AuthorizationData) == 0 {
-		return fmt.Errorf("received empty authorization data in token: %s", authToken)
+		return errors.Errorf("received empty authorization data in token: %s", authToken)
 	}
 
 	authData := authToken.AuthorizationData[0]
@@ -94,23 +100,10 @@ func (e *ecr) refreshDockerClient() error {
 	basicAuth := string(decoded)
 	colon := strings.Index(basicAuth, ":")
 	if colon == -1 {
-		return fmt.Errorf("Malformed basic auth response from AWS '%s'", basicAuth)
+		return errors.Errorf("malformed basic auth response from AWS '%s'", basicAuth)
 	}
 
-	conf := docker.Config{
-		Endpoint: e.endpoint,
-		Username: basicAuth[:colon],
-		Password: basicAuth[colon+1:],
-	}
-
-	client, err := docker.NewDockerRegistryWithConfig(conf, e.integration)
-	if err != nil {
-		return err
-	}
-
-	e.Registry = client
-	e.expiryTime = *authData.ExpiresAt
-	return nil
+	return e.setRegistry(basicAuth[:colon], basicAuth[colon+1:], *authData.ExpiresAt)
 }
 
 // Metadata returns the metadata via this registries implementation
@@ -163,15 +156,46 @@ func newRegistry(integration *storage.ImageIntegration) (*ecr, error) {
 		// docker endpoint
 		endpoint: fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com", conf.GetRegistryId(), conf.GetRegion()),
 	}
-	service, err := createECRClient(conf)
-	if err != nil {
-		return nil, err
-	}
-	reg.service = service
-	if err := reg.refreshDockerClient(); err != nil {
-		return nil, err
+	// If Authentication Data was provided, we do not initialize an ECR client and
+	// create the registry immediately since the credentials are statically provided
+	// by the Authentication Data payload.
+	if authData := ecrConfig.Ecr.GetAuthorizationData(); authData != nil {
+		expiresAt, err := protobuftypes.TimestampFromProto(authData.GetExpiresAt())
+		if err != nil {
+			return nil, errors.New("invalid authorization data")
+		}
+		if err = reg.setRegistry(authData.GetUsername(), authData.GetPassword(), expiresAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to create registry client")
+		}
+	} else {
+		service, err := createECRClient(conf)
+		if err != nil {
+			return nil, err
+		}
+		reg.service = service
+		// Refreshing the client will force the creation of the registry client using AWS ECR.
+		if err := reg.refreshDockerClient(); err != nil {
+			return nil, err
+		}
 	}
 	return reg, nil
+}
+
+// setRegistry creates and sets the docker registry client based on the
+// credentials provided.
+func (e *ecr) setRegistry(username, password string, expiresAt time.Time) error {
+	conf := docker.Config{
+		Endpoint: e.endpoint,
+		Username: username,
+		Password: password,
+	}
+	client, err := docker.NewDockerRegistryWithConfig(conf, e.integration)
+	if err != nil {
+		return err
+	}
+	e.Registry = client
+	e.expiryTime = expiresAt
+	return err
 }
 
 // createECRClient creates an AWS ECR SDK client based on the integration config.
