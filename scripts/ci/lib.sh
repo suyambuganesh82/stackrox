@@ -297,10 +297,6 @@ mark_collector_release() {
     local tag="$1"
     local username="$2"
 
-    if ! is_release_version "$tag"; then
-        die "A release version is required. Got $tag"
-    fi
-
     ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
     info "Check out collector source code"
