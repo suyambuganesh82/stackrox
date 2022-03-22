@@ -4705,14 +4705,9 @@ workflows:
           requires:
             - pre-build-cli
       - mark-collector-release:
-          <<: *runOnlyOnReleaseBuilds
+          <<: *runOnAllTagsWithQuayIOPullCtx
           context:
             - custom-executor-pull
-          requires:
-            - build
-            - go-unit-tests
-            - ui-unit-tests
-            - push-release
 
       - provision-openshift-rosa-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
