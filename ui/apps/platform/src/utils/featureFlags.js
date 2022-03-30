@@ -14,6 +14,7 @@ export const knownBackendFlags = {
     ROX_SYSTEM_HEALTH_PF: 'ROX_SYSTEM_HEALTH_PF',
     ROX_POLICIES_PATTERNFLY: 'ROX_POLICIES_PATTERNFLY',
     ROX_VULN_REPORTING: 'ROX_VULN_REPORTING',
+    ROX_ECR_AUTO_INTEGRATION: 'ROX_ECR_AUTO_INTEGRATION',
 };
 
 // isBackendFeatureFlagEnabled returns whether a feature flag retrieved from the backend is enabled.
