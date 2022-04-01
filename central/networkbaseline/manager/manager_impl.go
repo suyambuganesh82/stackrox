@@ -223,6 +223,7 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
+	return nil
 	if _, exists := m.baselinesByDeploymentID[deploymentID]; exists {
 		return nil
 	}
@@ -240,6 +241,7 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 }
 
 func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace)
@@ -294,12 +296,14 @@ func (m *manager) processDeploymentDelete(deploymentID string) error {
 }
 
 func (m *manager) ProcessDeploymentDelete(deploymentID string) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processDeploymentDelete(deploymentID)
 }
 
 func (m *manager) ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processFlowUpdate(flows)
@@ -333,6 +337,7 @@ func (m *manager) validatePeers(peers []*v1.NetworkBaselinePeerStatus) error {
 }
 
 func (m *manager) ProcessBaselineStatusUpdate(ctx context.Context, modifyRequest *v1.ModifyBaselineStatusForPeersRequest) error {
+	return nil
 	deploymentID := modifyRequest.GetDeploymentId()
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -494,6 +499,7 @@ func (m *manager) ProcessNetworkPolicyUpdate(
 	action central.ResourceAction,
 	policy *storage.NetworkPolicy,
 ) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processNetworkPolicyUpdate(ctx, action, policy)
@@ -532,6 +538,7 @@ func (m *manager) processBaselineLockUpdate(ctx context.Context, deploymentID st
 }
 
 func (m *manager) ProcessBaselineLockUpdate(ctx context.Context, deploymentID string, lockBaseline bool) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processBaselineLockUpdate(ctx, deploymentID, lockBaseline)
@@ -586,6 +593,7 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 }
 
 func (m *manager) ProcessPostClusterDelete(clusterID string) error {
+	return nil
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processPostClusterDelete(clusterID)

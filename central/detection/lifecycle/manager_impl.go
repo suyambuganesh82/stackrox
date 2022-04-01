@@ -165,6 +165,7 @@ func (m *managerImpl) flushIndicatorQueue() {
 	if features.ActiveVulnManagement.Enabled() {
 		m.processAggregator.Add(indicatorSlice)
 	}
+	return
 
 	defer centralMetrics.SetFunctionSegmentDuration(time.Now(), "CheckAndUpdateBaseline")
 
