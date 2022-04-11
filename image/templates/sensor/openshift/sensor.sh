@@ -33,8 +33,11 @@ echo "Creating sensor security context constraints..."
 ${KUBE_COMMAND} apply -f "$DIR/sensor-scc.yaml"
 echo "Creating sensor network policies..."
 ${KUBE_COMMAND} apply -f "$DIR/sensor-netpol.yaml"
-echo "Creating sensor pod security policies..."
-${KUBE_COMMAND} apply -f "$DIR/sensor-pod-security.yaml"
+
+if [[ -f "$DIR/sensor-pod-security.yaml" ]]; then
+  echo "Creating sensor pod security policies..."
+  ${KUBE_COMMAND} apply -f "$DIR/sensor-pod-security.yaml"
+fi
 
 # OpenShift roles can be delayed to be added
 sleep 5
@@ -82,8 +85,10 @@ ${KUBE_COMMAND} apply -f "$DIR/admission-controller-rbac.yaml"
 echo "Creating admission controller network policies..."
 ${KUBE_COMMAND} apply -f "$DIR/admission-controller-netpol.yaml"
 echo "Creating admission controller pod security policies..."
-${KUBE_COMMAND} apply -f "$DIR/admission-controller-pod-security.yaml"
-echo "Creating admission controller deployment..."
+if [[ -f "$DIR/admission-controller-pod-security.yaml" ]]; then
+  ${KUBE_COMMAND} apply -f "$DIR/admission-controller-pod-security.yaml"
+  echo "Creating admission controller deployment..."
+fi
 ${KUBE_COMMAND} apply -f "$DIR/admission-controller.yaml"
 
 echo "Creating collector security context constraints..."
@@ -94,8 +99,10 @@ echo "Creating collector RBAC roles..."
 ${KUBE_COMMAND} apply -f "$DIR/collector-rbac.yaml"
 echo "Creating collector network policies..."
 ${KUBE_COMMAND} apply -f "$DIR/collector-netpol.yaml"
-echo "Creating collector pod security policies..."
-${KUBE_COMMAND} apply -f "$DIR/collector-pod-security.yaml"
+if [[ -f "$DIR/collector-pod-security.yaml" ]]; then
+  echo "Creating collector pod security policies..."
+  ${KUBE_COMMAND} apply -f "$DIR/collector-pod-security.yaml"
+fi
 echo "Creating collector daemon set..."
 ${KUBE_COMMAND} apply -f "$DIR/collector.yaml"
 

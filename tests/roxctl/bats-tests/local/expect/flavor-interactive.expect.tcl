@@ -27,7 +27,7 @@ set registry [lindex $argv 3]
 set exitWith 0
 
 if {[llength $argv] != 4} {
-  send_user "Usage: expect <script> <binary> <out_dir> <expected_registry_prefix>\n"
+  send_user "Usage: expect <script> <binary> <flavor> <out_dir> <expected_registry_prefix>\n"
   exit 1
 }
 
@@ -37,6 +37,7 @@ expect "Enter path to the backup bundle from which to restore keys and certifica
 expect "Enter read templates from local filesystem*" { send "\n" }
 expect "Enter path to helm templates on your local filesystem*" { send "\n" }
 expect "Enter PEM cert bundle file*" { send "\n" }
+expect "Enter Generate deprecated PodSecurityPolicy resources*" { send "\n" }
 expect "Enter administrator password*" { send "\n" }
 expect "Enter orchestrator (k8s, openshift)*" { send "k8s\n" }
 expect "Enter the directory to output the deployment bundle to*" { send "$out_dir\n" }

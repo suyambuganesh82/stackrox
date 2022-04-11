@@ -11,4 +11,6 @@ type Scanner struct {
 	OfflineMode    bool   `json:"offlineMode"`
 
 	IstioVersion string `json:"istioVersion"`
+
+	DisableDeprecatedPodSecurityPolicies bool `json:"disableDeprecatedPodSecurityPolicies"`
 }

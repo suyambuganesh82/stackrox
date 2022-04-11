@@ -1939,6 +1939,10 @@ commands:
               fi
             fi
 
+            if [[ -n "${POD_SECURITY_POLICIES:-}" ]]; then
+              cci-export POD_SECURITY_POLICIES "$POD_SECURITY_POLICIES"
+            fi
+
             deploy_dir="deploy/<< parameters.orchestrator-flavor >>"
             "${deploy_dir}/central.sh"
 
@@ -2942,6 +2946,21 @@ jobs:
       - provision-gke-cluster:
           cluster-id: api-e2e-tests
 
+  provision-gke-api-e2e-tests-no-psps:
+    executor: custom
+    resource_class: small
+    environment:
+      - GCP_IMAGE_TYPE: "COS"
+      - POD_SECURITY_POLICIES: "false"
+    steps:
+      - checkout
+      - check-backend-changes
+      - check-label-to-skip-tests:
+          label: ci-no-qa-tests
+
+      - provision-gke-cluster:
+          cluster-id: api-e2e-tests-no-psps
+
   provision-gke-postgres-api-e2e-tests:
     executor: custom
     resource_class: small
@@ -3603,6 +3622,36 @@ jobs:
       - run-qa-tests:
           cluster-id: api-e2e-tests
           sensor-deploy-flavor: helm
+          determine-whether-to-run:
+            - check-label-to-skip-tests:
+                label: ci-no-qa-tests
+
+  gke-api-e2e-tests-no-psps:
+    executor: custom
+    environment:
+      - LOCAL_PORT: 443
+      - COLLECTION_METHOD: ebpf
+      - GCP_IMAGE_TYPE: "COS"
+      - MONITORING_SUPPORT: false
+      - SCANNER_SUPPORT: true
+      - ROX_BASELINE_GENERATION_DURATION: 1m
+      - LOAD_BALANCER: lb
+      - ADMISSION_CONTROLLER: true
+      - ADMISSION_CONTROLLER_UPDATES: true
+      - ROX_NETWORK_BASELINE_OBSERVATION_PERIOD: 2m
+      - ROX_NEW_POLICY_CATEGORIES: true
+      - POD_SECURITY_POLICIES: false
+
+    steps:
+      - run-qa-tests:
+          cluster-id: api-e2e-tests-no-psps
+          sensor-deploy-flavor: helm
+          determine-whether-to-run:
+            - check-label-to-skip-tests:
+                label: ci-no-qa-tests
+      - run-qa-tests:
+          cluster-id: api-e2e-tests-no-psps
+          sensor-deploy-flavor: kubectl
           determine-whether-to-run:
             - check-label-to-skip-tests:
                 label: ci-no-qa-tests
@@ -4840,6 +4889,15 @@ workflows:
             - build-rhacs
             - build-scale-monitoring-and-mock-server
             - provision-gke-api-e2e-tests
+      - provision-gke-api-e2e-tests-no-psps:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+      - gke-api-e2e-tests-no-psps:
+          <<: *runOnAllTagsWithQuayIOPullCtx
+          requires:
+            - build-stackrox
+            - build-rhacs
+            - build-scale-monitoring-and-mock-server
+            - provision-gke-api-e2e-tests-no-psps
       - provision-gke-postgres-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
       - gke-postgres-api-e2e-tests:
