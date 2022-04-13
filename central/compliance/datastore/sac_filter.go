@@ -167,7 +167,7 @@ func (ds *sacFilterImpl) filterDomain(ctx context.Context, domain *storage.Compl
 			return nil, false, err
 		}
 
-		newDomain.Deployments = filteredMap.(map[string]*storage.Deployment)
+		newDomain.Deployments = filteredMap.(map[string]*storage.ComplianceDomain_Deployment)
 		if len(newDomain.Deployments) < len(domain.Deployments) {
 			filtered = true
 		}
