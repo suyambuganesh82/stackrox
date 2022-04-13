@@ -366,6 +366,7 @@ func registerGeneratedTypes(builder generator.SchemaBuilder) {
 		"name: String!",
 	}))
 	utils.Must(builder.AddType("ComplianceDomain_Deployment", []string{
+		"clusterName: String!",
 		"id: ID!",
 		"name: String!",
 		"namespace: String!",
@@ -373,6 +374,7 @@ func registerGeneratedTypes(builder generator.SchemaBuilder) {
 		"type: String!",
 	}))
 	utils.Must(builder.AddType("ComplianceDomain_Node", []string{
+		"clusterName: String!",
 		"id: ID!",
 		"name: String!",
 	}))
@@ -4224,6 +4226,11 @@ func (resolver *Resolver) wrapComplianceDomain_Deployments(values []*storage.Com
 	return output, nil
 }
 
+func (resolver *complianceDomain_DeploymentResolver) ClusterName(ctx context.Context) string {
+	value := resolver.data.GetClusterName()
+	return value
+}
+
 func (resolver *complianceDomain_DeploymentResolver) Id(ctx context.Context) graphql.ID {
 	value := resolver.data.GetId()
 	return graphql.ID(value)
@@ -4271,6 +4278,11 @@ func (resolver *Resolver) wrapComplianceDomain_Nodes(values []*storage.Complianc
 		output[i] = &complianceDomain_NodeResolver{root: resolver, data: v}
 	}
 	return output, nil
+}
+
+func (resolver *complianceDomain_NodeResolver) ClusterName(ctx context.Context) string {
+	value := resolver.data.GetClusterName()
+	return value
 }
 
 func (resolver *complianceDomain_NodeResolver) Id(ctx context.Context) graphql.ID {
