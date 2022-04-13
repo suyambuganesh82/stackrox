@@ -366,6 +366,7 @@ func registerGeneratedTypes(builder generator.SchemaBuilder) {
 		"name: String!",
 	}))
 	utils.Must(builder.AddType("ComplianceDomain_Deployment", []string{
+		"clusterId: String!",
 		"clusterName: String!",
 		"id: ID!",
 		"name: String!",
@@ -4224,6 +4225,11 @@ func (resolver *Resolver) wrapComplianceDomain_Deployments(values []*storage.Com
 		output[i] = &complianceDomain_DeploymentResolver{root: resolver, data: v}
 	}
 	return output, nil
+}
+
+func (resolver *complianceDomain_DeploymentResolver) ClusterId(ctx context.Context) string {
+	value := resolver.data.GetClusterId()
+	return value
 }
 
 func (resolver *complianceDomain_DeploymentResolver) ClusterName(ctx context.Context) string {

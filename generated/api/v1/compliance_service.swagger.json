@@ -528,6 +528,9 @@
         },
         "clusterName": {
           "type": "string"
+        },
+        "clusterId": {
+          "type": "string"
         }
       }
     },
