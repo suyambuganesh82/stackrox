@@ -506,15 +506,13 @@
         "name": {
           "type": "string"
         }
-      }
+      },
+      "title": "These must mirror the tags _exactly_ in cluster.proto for backwards compatibility"
     },
     "storageComplianceDomainDeployment": {
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
-        },
-        "namespaceId": {
           "type": "string"
         },
         "name": {
@@ -526,13 +524,17 @@
         "namespace": {
           "type": "string"
         },
-        "clusterName": {
+        "namespaceId": {
           "type": "string"
         },
         "clusterId": {
           "type": "string"
+        },
+        "clusterName": {
+          "type": "string"
         }
-      }
+      },
+      "title": "This must mirror the tags _exactly_ in deployment.proto for backwards compatibility"
     },
     "storageComplianceDomainNode": {
       "type": "object",
@@ -543,10 +545,14 @@
         "name": {
           "type": "string"
         },
+        "clusterId": {
+          "type": "string"
+        },
         "clusterName": {
           "type": "string"
         }
-      }
+      },
+      "title": "These must mirror the tags _exactly_ in node.proto for backwards compatibility"
     },
     "storageComplianceResource": {
       "type": "object",
