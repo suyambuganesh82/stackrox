@@ -40,16 +40,6 @@ var (
 	jsonPathPattern = regexp.MustCompile(`^(\[\d+\]|\.[^[.]+)`)
 )
 
-func TestT(t *testing.T) {
-	opts := []graphql.SchemaOpt{graphql.Logger(&logger{})}
-	s := resolvers.Schema()
-	_, err := graphql.ParseSchema(s, &resolvers.Resolver{}, opts...)
-	if err != nil {
-		log.Errorf("Unable to parse schema:\n%q", s)
-		panic(err)
-	}
-}
-
 type mocks struct {
 	cluster        *clusterMocks.MockDataStore
 	deployment     *deploymentMocks.MockDataStore
