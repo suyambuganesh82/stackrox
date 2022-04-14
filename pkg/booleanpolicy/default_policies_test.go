@@ -2151,6 +2151,10 @@ func (suite *DefaultPoliciesTestSuite) TestImageVerified() {
 
 	var images = []*storage.Image{
 		imageWithSignatureVerificationResults("image_no_results", []*storage.ImageSignatureVerificationResult{{}}),
+		imageWithSignatureVerificationResults("image_empty_results", []*storage.ImageSignatureVerificationResult{{
+			VerifierId: "",
+			Status:     storage.ImageSignatureVerificationResult_UNSET,
+		}}),
 		imageWithSignatureVerificationResults("image_nil_results", nil),
 		imageWithSignatureVerificationResults("verified_by_0", []*storage.ImageSignatureVerificationResult{{
 			VerifierId: verifier0,
@@ -2184,74 +2188,61 @@ func (suite *DefaultPoliciesTestSuite) TestImageVerified() {
 		}
 		allImages = ai.Freeze()
 	}
+	getViolationMessages := func(img *storage.Image) set.StringSet {
+		messages := set.NewStringSet()
+		for _, r := range img.GetSignatureVerificationData().GetResults() {
+			if r.GetVerifierId() != "" && r.GetStatus() == storage.ImageSignatureVerificationResult_VERIFIED {
+				messages.Add(fmt.Sprintf("Image signature is verified by %s", r.GetVerifierId()))
+			}
+		}
+		return messages
+	}
+
+	suite.Run("Test disallowed AND operator", func() {
+		_, err := BuildImageMatcher(policyWithSingleFieldAndValues(fieldnames.ImageSignatureVerifiedBy,
+			[]string{verifier0}, false, storage.BooleanOperator_AND))
+		suite.EqualError(err,
+			"policy validation error: operator AND is not allowed for field \"Image Signature Verified By\"")
+	})
 
 	for i, testCase := range []struct {
 		values          []string
-		negate          bool
 		expectedMatches set.FrozenStringSet
 	}{
 		{
-			values:          []string{verifier0},
-			negate:          true,
-			expectedMatches: set.NewFrozenStringSet("verified_by_0"),
+			values:          []string{unverifier},
+			expectedMatches: allImages,
 		},
 		{
 			values:          []string{verifier0},
-			negate:          false,
 			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_0")),
 		},
 		{
 			values:          []string{verifier1},
-			negate:          true,
-			expectedMatches: set.NewFrozenStringSet(),
-		},
-		{
-			values:          []string{verifier1},
-			negate:          false,
 			expectedMatches: allImages,
 		},
 		{
 			values:          []string{verifier2},
-			negate:          true,
-			expectedMatches: set.NewFrozenStringSet("verified_by_2_and_3"),
-		},
-		{
-			values:          []string{verifier2},
-			negate:          false,
-			expectedMatches: allImages,
-		},
-		{
-			values:          []string{verifier0, verifier2},
-			negate:          true,
-			expectedMatches: set.NewFrozenStringSet("verified_by_0", "verified_by_2_and_3"),
-		},
-		{
-			values:          []string{verifier2, verifier3},
-			negate:          false,
-			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_3", "verified_by_2_and_3")),
-		},
-		// TODO(ROX-9996): Fix construction of the augmented object to allow for matching
-		// several verifier IDs.
-		/*{
-			values:          []string{verifier0, verifier2},
-			negate:          false,
-			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_0", "verified_by_2_and_3")),
+			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_2_and_3")),
 		},
 		{
 			values:          []string{verifier3},
-			negate:          false,
 			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_3", "verified_by_2_and_3")),
-		},*/
+		},
 		{
-			values:          []string{unverifier},
-			negate:          false,
-			expectedMatches: allImages,
+			values:          []string{verifier0, verifier2},
+			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_0", "verified_by_2_and_3")),
+		},
+		{
+			values:          []string{verifier2, verifier3},
+			expectedMatches: allImages.Difference(set.NewFrozenStringSet("verified_by_3", "verified_by_2_and_3")),
 		},
 	} {
 		c := testCase
 
 		suite.Run(fmt.Sprintf("ImageMatcher %d: %+v", i, c), func() {
-			imgMatcher, err := BuildImageMatcher(policyWithSingleFieldAndValues(fieldnames.ImageSignatureVerifiedBy, c.values, c.negate, storage.BooleanOperator_OR))
+			imgMatcher, err := BuildImageMatcher(policyWithSingleFieldAndValues(fieldnames.ImageSignatureVerifiedBy,
+				c.values, false, storage.BooleanOperator_OR))
 			suite.NoError(err)
 			matchedImages := set.NewStringSet()
 			for _, img := range images {
@@ -2261,14 +2252,10 @@ func (suite *DefaultPoliciesTestSuite) TestImageVerified() {
 					continue
 				}
 				matchedImages.Add(img.GetName().GetFullName())
-				suite.Truef(c.expectedMatches.Contains(img.GetName().GetFullName()), "Image %q should not match", img.GetName().GetFullName())
+				suite.Truef(c.expectedMatches.Contains(img.GetName().GetFullName()), "Image %q should not match",
+					img.GetName().GetFullName())
 
-				messages := set.NewStringSet()
-				for _, r := range img.GetSignatureVerificationData().GetResults() {
-					if r.GetVerifierId() != "" && r.GetStatus() == storage.ImageSignatureVerificationResult_VERIFIED {
-						messages.Add(fmt.Sprintf("Image signature is verified by %s", r.GetVerifierId()))
-					}
-				}
+				messages := getViolationMessages(img)
 				for _, violation := range violations.AlertViolations {
 					if messages.Cardinality() > 0 {
 						suite.Truef(messages.Contains(violation.GetMessage()), "Message not found %q", violation.GetMessage())
@@ -2348,6 +2335,72 @@ func (suite *DefaultPoliciesTestSuite) TestContainerName() {
 				}
 			}
 			assert.ElementsMatch(t, containerNameMatched.AsSlice(), c.expectedMatches, "Got %v for policy %v; expected: %v", containerNameMatched.AsSlice(), c.value, c.expectedMatches)
+		})
+	}
+}
+
+func (suite *DefaultPoliciesTestSuite) TestAllowPrivilegeEscalationPolicyCriteria() {
+	const containerAllowPrivEsc = "Container with Privilege Escalation allowed"
+	const containerNotAllowPrivEsc = "Container with Privilege Escalation not allowed"
+
+	var deps []*storage.Deployment
+	for _, d := range []struct {
+		ContainerName            string
+		AllowPrivilegeEscalation bool
+	}{
+		{
+			ContainerName:            containerAllowPrivEsc,
+			AllowPrivilegeEscalation: true,
+		},
+		{
+			ContainerName:            containerNotAllowPrivEsc,
+			AllowPrivilegeEscalation: false,
+		},
+	} {
+		dep := fixtures.GetDeployment().Clone()
+		dep.Containers[0].Name = d.ContainerName
+		if d.AllowPrivilegeEscalation {
+			dep.Containers[0].SecurityContext.AllowPrivilegeEscalation = d.AllowPrivilegeEscalation
+		}
+		deps = append(deps, dep)
+	}
+
+	for _, testCase := range []struct {
+		CaseName        string
+		value           string
+		expectedMatches []string
+	}{
+		{
+			CaseName:        "Policy for containers with privilege escalation allowed",
+			value:           "true",
+			expectedMatches: []string{containerAllowPrivEsc},
+		},
+		{
+			CaseName:        "Policy for containers with privilege escalation not allowed",
+			value:           "false",
+			expectedMatches: []string{containerNotAllowPrivEsc},
+		},
+	} {
+		c := testCase
+
+		suite.T().Run(c.CaseName, func(t *testing.T) {
+			depMatcher, err := BuildDeploymentMatcher(policyWithSingleKeyValue(fieldnames.AllowPrivilegeEscalation, c.value, false))
+			require.NoError(t, err)
+			containerNameMatched := set.NewStringSet()
+			for _, dep := range deps {
+				violations, err := depMatcher.MatchDeployment(nil, enhancedDeployment(dep, suite.getImagesForDeployment(dep)))
+				require.NoError(t, err)
+				if len(violations.AlertViolations) > 0 {
+					containerNameMatched.Add(dep.Containers[0].GetName())
+					require.Len(t, violations.AlertViolations, 1)
+					if c.value == "true" {
+						assert.Equal(t, fmt.Sprintf("Container '%s' allows privilege escalation", dep.Containers[0].GetName()), violations.AlertViolations[0].GetMessage())
+					} else {
+						assert.Equal(t, fmt.Sprintf("Container '%s' does not allow privilege escalation", dep.Containers[0].GetName()), violations.AlertViolations[0].GetMessage())
+					}
+				}
+			}
+			assert.ElementsMatch(t, containerNameMatched.AsSlice(), c.expectedMatches, "Matched containers %v for policy %v; expected: %v", containerNameMatched.AsSlice(), c.value, c.expectedMatches)
 		})
 	}
 }
@@ -3157,7 +3210,7 @@ func (suite *DefaultPoliciesTestSuite) TestNetworkPolicyFields() {
 				MissingEgressNetworkPolicy:  false,
 			},
 			alerts: []*storage.Alert_Violation{
-				{Message: "Missing Ingress Network Policy violation message placeholder"},
+				{Message: "The deployment is missing Ingress Network Policy.", Type: storage.Alert_Violation_NETWORK_POLICY},
 			},
 		},
 		"Missing Egress Network Policy": {
@@ -3166,7 +3219,7 @@ func (suite *DefaultPoliciesTestSuite) TestNetworkPolicyFields() {
 				MissingEgressNetworkPolicy:  true,
 			},
 			alerts: []*storage.Alert_Violation{
-				{Message: "Missing Egress Network Policy violation message placeholder"},
+				{Message: "The deployment is missing Egress Network Policy.", Type: storage.Alert_Violation_NETWORK_POLICY},
 			},
 		},
 		"Missing both policies": {
@@ -3175,8 +3228,8 @@ func (suite *DefaultPoliciesTestSuite) TestNetworkPolicyFields() {
 				MissingEgressNetworkPolicy:  true,
 			},
 			alerts: []*storage.Alert_Violation{
-				{Message: "Missing Ingress Network Policy violation message placeholder"},
-				{Message: "Missing Egress Network Policy violation message placeholder"},
+				{Message: "The deployment is missing Ingress Network Policy.", Type: storage.Alert_Violation_NETWORK_POLICY},
+				{Message: "The deployment is missing Egress Network Policy.", Type: storage.Alert_Violation_NETWORK_POLICY},
 			},
 		},
 		"No alerts": {
@@ -3189,6 +3242,29 @@ func (suite *DefaultPoliciesTestSuite) TestNetworkPolicyFields() {
 		"No violations on nil augmentedobj": {
 			netpolsApplied: nil,
 			alerts:         []*storage.Alert_Violation(nil),
+		},
+		"Policies attached to augmentedobj": {
+			netpolsApplied: &augmentedobjs.NetworkPoliciesApplied{
+				MissingIngressNetworkPolicy: true,
+				MissingEgressNetworkPolicy:  false,
+				Policies: map[string]*storage.NetworkPolicy{
+					"ID1": {Id: "ID1", Name: "policy1"},
+				},
+			},
+			alerts: []*storage.Alert_Violation{
+				{
+					Message: "The deployment is missing Ingress Network Policy.",
+					Type:    storage.Alert_Violation_NETWORK_POLICY,
+					MessageAttributes: &storage.Alert_Violation_KeyValueAttrs_{
+						KeyValueAttrs: &storage.Alert_Violation_KeyValueAttrs{
+							Attrs: []*storage.Alert_Violation_KeyValueAttrs_KeyValueAttr{
+								{Key: printer.PolicyID, Value: "ID1"},
+								{Key: printer.PolicyName, Value: "policy1"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -3208,7 +3284,13 @@ func (suite *DefaultPoliciesTestSuite) TestNetworkPolicyFields() {
 			v2 := suite.getViolations(missingEgressPolicy, enhanced)
 
 			allAlerts := append(v1.AlertViolations, v2.AlertViolations...)
-			suite.Equal(testCase.alerts, allAlerts)
+			for i, expected := range testCase.alerts {
+				suite.Equal(expected.GetType(), allAlerts[i].Type)
+				suite.Equal(expected.GetMessage(), allAlerts[i].Message)
+				suite.Equal(expected.GetKeyValueAttrs(), allAlerts[i].GetKeyValueAttrs())
+				// We do not want to compare time, as the violation timestamp uses now()
+				suite.NotNil(allAlerts[i].GetTime())
+			}
 		})
 	}
 }

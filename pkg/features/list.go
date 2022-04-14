@@ -6,9 +6,6 @@ var (
 	// csvExport enables CSV export of search results.
 	csvExport = registerFeature("Enable CSV export of search results", "ROX_CSV_EXPORT", false)
 
-	// ComplianceInRocksDB switches compliance over to using RocksDB instead of Bolt
-	ComplianceInRocksDB = registerFeature("Switch compliance to using RocksDB", "ROX_COMPLIANCE_IN_ROCKSDB", true)
-
 	// NetworkDetectionBaselineSimulation enables new features related to the baseline simulation part of the network detection experience.
 	NetworkDetectionBaselineSimulation = registerFeature("Enable network detection baseline simulation", "ROX_NETWORK_DETECTION_BASELINE_SIMULATION", true)
 
@@ -40,7 +37,7 @@ var (
 	LocalImageScanning = registerFeature("Enable OpenShift local-image scanning", "ROX_LOCAL_IMAGE_SCANNING", true)
 
 	// ImageSignatureVerification enables image signature verification.
-	ImageSignatureVerification = registerFeature("Enable Image Signature Verification workflow", "ROX_VERIFY_IMAGE_SIGNATURE", false)
+	ImageSignatureVerification = registerFeature("Enable Image Signature Verification workflow", "ROX_VERIFY_IMAGE_SIGNATURE", true)
 
 	// PostgresDatastore enables Postgres datastore.
 	PostgresDatastore = registerFeature("Enable Postgres Datastore", "ROX_POSTGRES_DATASTORE", false)

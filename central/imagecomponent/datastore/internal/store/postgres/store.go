@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stackrox/rox/central/globaldb"
 	"github.com/stackrox/rox/central/metrics"
+	pkgSchema "github.com/stackrox/rox/central/postgres/schema"
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/logging"
 	ops "github.com/stackrox/rox/pkg/metrics"
@@ -22,10 +23,10 @@ import (
 const (
 	baseTable  = "image_components"
 	countStmt  = "SELECT COUNT(*) FROM image_components"
-	existsStmt = "SELECT EXISTS(SELECT 1 FROM image_components WHERE Id = $1 AND Name = $2 AND Version = $3 AND OperatingSystem = $4)"
+	existsStmt = "SELECT EXISTS(SELECT 1 FROM image_components WHERE Id = $1 AND OperatingSystem = $2)"
 
-	getStmt    = "SELECT serialized FROM image_components WHERE Id = $1 AND Name = $2 AND Version = $3 AND OperatingSystem = $4"
-	deleteStmt = "DELETE FROM image_components WHERE Id = $1 AND Name = $2 AND Version = $3 AND OperatingSystem = $4"
+	getStmt    = "SELECT serialized FROM image_components WHERE Id = $1 AND OperatingSystem = $2"
+	deleteStmt = "DELETE FROM image_components WHERE Id = $1 AND OperatingSystem = $2"
 	walkStmt   = "SELECT serialized FROM image_components"
 
 	batchAfter = 100
@@ -37,21 +38,25 @@ const (
 )
 
 var (
-	schema = walker.Walk(reflect.TypeOf((*storage.ImageComponent)(nil)), baseTable)
 	log    = logging.LoggerForModule()
+	schema = func() *walker.Schema {
+		schema := globaldb.GetSchemaForTable(baseTable)
+		if schema != nil {
+			return schema
+		}
+		schema = walker.Walk(reflect.TypeOf((*storage.ImageComponent)(nil)), baseTable)
+		globaldb.RegisterTable(schema)
+		return schema
+	}()
 )
-
-func init() {
-	globaldb.RegisterTable(schema)
-}
 
 type Store interface {
 	Count(ctx context.Context) (int, error)
-	Exists(ctx context.Context, id string, name string, version string, operatingSystem string) (bool, error)
-	Get(ctx context.Context, id string, name string, version string, operatingSystem string) (*storage.ImageComponent, bool, error)
+	Exists(ctx context.Context, id string, operatingSystem string) (bool, error)
+	Get(ctx context.Context, id string, operatingSystem string) (*storage.ImageComponent, bool, error)
 	Upsert(ctx context.Context, obj *storage.ImageComponent) error
 	UpsertMany(ctx context.Context, objs []*storage.ImageComponent) error
-	Delete(ctx context.Context, id string, name string, version string, operatingSystem string) error
+	Delete(ctx context.Context, id string, operatingSystem string) error
 
 	Walk(ctx context.Context, fn func(obj *storage.ImageComponent) error) error
 
@@ -63,33 +68,13 @@ type storeImpl struct {
 	db *pgxpool.Pool
 }
 
-func createTableImageComponents(ctx context.Context, db *pgxpool.Pool) {
-	table := `
-create table if not exists image_components (
-    Id varchar,
-    Name varchar,
-    Version varchar,
-    Source integer,
-    RiskScore numeric,
-    TopCvss numeric,
-    OperatingSystem varchar,
-    serialized bytea,
-    PRIMARY KEY(Id, Name, Version, OperatingSystem)
-)
-`
+// New returns a new Store instance using the provided sql instance.
+func New(ctx context.Context, db *pgxpool.Pool) Store {
+	pgutils.CreateTable(ctx, db, pkgSchema.CreateTableImageComponentsStmt)
 
-	_, err := db.Exec(ctx, table)
-	if err != nil {
-		log.Panicf("Error creating table %s: %v", table, err)
+	return &storeImpl{
+		db: db,
 	}
-
-	indexes := []string{}
-	for _, index := range indexes {
-		if _, err := db.Exec(ctx, index); err != nil {
-			log.Panicf("Error creating index %s: %v", index, err)
-		}
-	}
-
 }
 
 func insertIntoImageComponents(ctx context.Context, tx pgx.Tx, obj *storage.ImageComponent) error {
@@ -111,7 +96,7 @@ func insertIntoImageComponents(ctx context.Context, tx pgx.Tx, obj *storage.Imag
 		serialized,
 	}
 
-	finalStr := "INSERT INTO image_components (Id, Name, Version, Source, RiskScore, TopCvss, OperatingSystem, serialized) VALUES($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(Id, Name, Version, OperatingSystem) DO UPDATE SET Id = EXCLUDED.Id, Name = EXCLUDED.Name, Version = EXCLUDED.Version, Source = EXCLUDED.Source, RiskScore = EXCLUDED.RiskScore, TopCvss = EXCLUDED.TopCvss, OperatingSystem = EXCLUDED.OperatingSystem, serialized = EXCLUDED.serialized"
+	finalStr := "INSERT INTO image_components (Id, Name, Version, Source, RiskScore, TopCvss, OperatingSystem, serialized) VALUES($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(Id, OperatingSystem) DO UPDATE SET Id = EXCLUDED.Id, Name = EXCLUDED.Name, Version = EXCLUDED.Version, Source = EXCLUDED.Source, RiskScore = EXCLUDED.RiskScore, TopCvss = EXCLUDED.TopCvss, OperatingSystem = EXCLUDED.OperatingSystem, serialized = EXCLUDED.serialized"
 	_, err := tx.Exec(ctx, finalStr, values...)
 	if err != nil {
 		return err
@@ -173,7 +158,7 @@ func (s *storeImpl) copyFromImageComponents(ctx context.Context, tx pgx.Tx, objs
 			serialized,
 		})
 
-		if _, err := tx.Exec(ctx, deleteStmt, obj.GetId(), obj.GetName(), obj.GetVersion(), obj.GetOperatingSystem()); err != nil {
+		if _, err := tx.Exec(ctx, deleteStmt, obj.GetId(), obj.GetOperatingSystem()); err != nil {
 			return err
 		}
 
@@ -194,15 +179,6 @@ func (s *storeImpl) copyFromImageComponents(ctx context.Context, tx pgx.Tx, objs
 	}
 
 	return err
-}
-
-// New returns a new Store instance using the provided sql instance.
-func New(ctx context.Context, db *pgxpool.Pool) Store {
-	createTableImageComponents(ctx, db)
-
-	return &storeImpl{
-		db: db,
-	}
 }
 
 func (s *storeImpl) copyFrom(ctx context.Context, objs ...*storage.ImageComponent) error {
@@ -284,10 +260,10 @@ func (s *storeImpl) Count(ctx context.Context) (int, error) {
 }
 
 // Exists returns if the id exists in the store
-func (s *storeImpl) Exists(ctx context.Context, id string, name string, version string, operatingSystem string) (bool, error) {
+func (s *storeImpl) Exists(ctx context.Context, id string, operatingSystem string) (bool, error) {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Exists, "ImageComponent")
 
-	row := s.db.QueryRow(ctx, existsStmt, id, name, version, operatingSystem)
+	row := s.db.QueryRow(ctx, existsStmt, id, operatingSystem)
 	var exists bool
 	if err := row.Scan(&exists); err != nil {
 		return false, pgutils.ErrNilIfNoRows(err)
@@ -296,7 +272,7 @@ func (s *storeImpl) Exists(ctx context.Context, id string, name string, version 
 }
 
 // Get returns the object, if it exists from the store
-func (s *storeImpl) Get(ctx context.Context, id string, name string, version string, operatingSystem string) (*storage.ImageComponent, bool, error) {
+func (s *storeImpl) Get(ctx context.Context, id string, operatingSystem string) (*storage.ImageComponent, bool, error) {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Get, "ImageComponent")
 
 	conn, release, err := s.acquireConn(ctx, ops.Get, "ImageComponent")
@@ -305,7 +281,7 @@ func (s *storeImpl) Get(ctx context.Context, id string, name string, version str
 	}
 	defer release()
 
-	row := conn.QueryRow(ctx, getStmt, id, name, version, operatingSystem)
+	row := conn.QueryRow(ctx, getStmt, id, operatingSystem)
 	var data []byte
 	if err := row.Scan(&data); err != nil {
 		return nil, false, pgutils.ErrNilIfNoRows(err)
@@ -328,7 +304,7 @@ func (s *storeImpl) acquireConn(ctx context.Context, op ops.Op, typ string) (*pg
 }
 
 // Delete removes the specified ID from the store
-func (s *storeImpl) Delete(ctx context.Context, id string, name string, version string, operatingSystem string) error {
+func (s *storeImpl) Delete(ctx context.Context, id string, operatingSystem string) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Remove, "ImageComponent")
 
 	conn, release, err := s.acquireConn(ctx, ops.Remove, "ImageComponent")
@@ -337,7 +313,7 @@ func (s *storeImpl) Delete(ctx context.Context, id string, name string, version 
 	}
 	defer release()
 
-	if _, err := conn.Exec(ctx, deleteStmt, id, name, version, operatingSystem); err != nil {
+	if _, err := conn.Exec(ctx, deleteStmt, id, operatingSystem); err != nil {
 		return err
 	}
 	return nil

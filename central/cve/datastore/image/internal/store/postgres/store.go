@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stackrox/rox/central/globaldb"
 	"github.com/stackrox/rox/central/metrics"
+	pkgSchema "github.com/stackrox/rox/central/postgres/schema"
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/logging"
 	ops "github.com/stackrox/rox/pkg/metrics"
@@ -37,13 +38,17 @@ const (
 )
 
 var (
-	schema = walker.Walk(reflect.TypeOf((*storage.CVE)(nil)), baseTable)
 	log    = logging.LoggerForModule()
+	schema = func() *walker.Schema {
+		schema := globaldb.GetSchemaForTable(baseTable)
+		if schema != nil {
+			return schema
+		}
+		schema = walker.Walk(reflect.TypeOf((*storage.CVE)(nil)), baseTable)
+		globaldb.RegisterTable(schema)
+		return schema
+	}()
 )
-
-func init() {
-	globaldb.RegisterTable(schema)
-}
 
 type Store interface {
 	Count(ctx context.Context) (int, error)
@@ -63,35 +68,13 @@ type storeImpl struct {
 	db *pgxpool.Pool
 }
 
-func createTableImageCves(ctx context.Context, db *pgxpool.Pool) {
-	table := `
-create table if not exists image_cves (
-    Id varchar,
-    OperatingSystem varchar,
-    Cvss numeric,
-    ImpactScore numeric,
-    PublishedOn timestamp,
-    CreatedAt timestamp,
-    Suppressed bool,
-    SuppressExpiry timestamp,
-    Severity integer,
-    serialized bytea,
-    PRIMARY KEY(Id, OperatingSystem)
-)
-`
+// New returns a new Store instance using the provided sql instance.
+func New(ctx context.Context, db *pgxpool.Pool) Store {
+	pgutils.CreateTable(ctx, db, pkgSchema.CreateTableImageCvesStmt)
 
-	_, err := db.Exec(ctx, table)
-	if err != nil {
-		log.Panicf("Error creating table %s: %v", table, err)
+	return &storeImpl{
+		db: db,
 	}
-
-	indexes := []string{}
-	for _, index := range indexes {
-		if _, err := db.Exec(ctx, index); err != nil {
-			log.Panicf("Error creating index %s: %v", index, err)
-		}
-	}
-
 }
 
 func insertIntoImageCves(ctx context.Context, tx pgx.Tx, obj *storage.CVE) error {
@@ -104,6 +87,7 @@ func insertIntoImageCves(ctx context.Context, tx pgx.Tx, obj *storage.CVE) error
 	values := []interface{}{
 		// parent primary keys start
 		obj.GetId(),
+		obj.GetCve(),
 		obj.GetOperatingSystem(),
 		obj.GetCvss(),
 		obj.GetImpactScore(),
@@ -115,7 +99,7 @@ func insertIntoImageCves(ctx context.Context, tx pgx.Tx, obj *storage.CVE) error
 		serialized,
 	}
 
-	finalStr := "INSERT INTO image_cves (Id, OperatingSystem, Cvss, ImpactScore, PublishedOn, CreatedAt, Suppressed, SuppressExpiry, Severity, serialized) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT(Id, OperatingSystem) DO UPDATE SET Id = EXCLUDED.Id, OperatingSystem = EXCLUDED.OperatingSystem, Cvss = EXCLUDED.Cvss, ImpactScore = EXCLUDED.ImpactScore, PublishedOn = EXCLUDED.PublishedOn, CreatedAt = EXCLUDED.CreatedAt, Suppressed = EXCLUDED.Suppressed, SuppressExpiry = EXCLUDED.SuppressExpiry, Severity = EXCLUDED.Severity, serialized = EXCLUDED.serialized"
+	finalStr := "INSERT INTO image_cves (Id, Cve, OperatingSystem, Cvss, ImpactScore, PublishedOn, CreatedAt, Suppressed, SuppressExpiry, Severity, serialized) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT(Id, OperatingSystem) DO UPDATE SET Id = EXCLUDED.Id, Cve = EXCLUDED.Cve, OperatingSystem = EXCLUDED.OperatingSystem, Cvss = EXCLUDED.Cvss, ImpactScore = EXCLUDED.ImpactScore, PublishedOn = EXCLUDED.PublishedOn, CreatedAt = EXCLUDED.CreatedAt, Suppressed = EXCLUDED.Suppressed, SuppressExpiry = EXCLUDED.SuppressExpiry, Severity = EXCLUDED.Severity, serialized = EXCLUDED.serialized"
 	_, err := tx.Exec(ctx, finalStr, values...)
 	if err != nil {
 		return err
@@ -133,6 +117,8 @@ func (s *storeImpl) copyFromImageCves(ctx context.Context, tx pgx.Tx, objs ...*s
 	copyCols := []string{
 
 		"id",
+
+		"cve",
 
 		"operatingsystem",
 
@@ -165,6 +151,8 @@ func (s *storeImpl) copyFromImageCves(ctx context.Context, tx pgx.Tx, objs ...*s
 		inputRows = append(inputRows, []interface{}{
 
 			obj.GetId(),
+
+			obj.GetCve(),
 
 			obj.GetOperatingSystem(),
 
@@ -206,15 +194,6 @@ func (s *storeImpl) copyFromImageCves(ctx context.Context, tx pgx.Tx, objs ...*s
 	}
 
 	return err
-}
-
-// New returns a new Store instance using the provided sql instance.
-func New(ctx context.Context, db *pgxpool.Pool) Store {
-	createTableImageCves(ctx, db)
-
-	return &storeImpl{
-		db: db,
-	}
 }
 
 func (s *storeImpl) copyFrom(ctx context.Context, objs ...*storage.CVE) error {

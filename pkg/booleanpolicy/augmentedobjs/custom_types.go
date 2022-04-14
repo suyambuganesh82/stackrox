@@ -49,6 +49,7 @@ type impersonatedEventResult struct {
 type NetworkPoliciesApplied struct {
 	MissingIngressNetworkPolicy bool `policy:"Missing Ingress Network Policy"`
 	MissingEgressNetworkPolicy  bool `policy:"Missing Egress Network Policy"`
+	Policies                    map[string]*storage.NetworkPolicy
 }
 
 // NetworkFlowDetails captures information about a particular network flow.
@@ -80,5 +81,5 @@ type envVar struct {
 }
 
 type imageSignatureVerification struct {
-	VerifierID string `search:"Image Signature Verified By"`
+	VerifierIDs []string `search:"Image Signature Verified By"`
 }
