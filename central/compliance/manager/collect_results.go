@@ -56,6 +56,7 @@ func convertDeployment(dep *storage.Deployment) *storage.ComplianceDomain_Deploy
 		Name:        dep.GetName(),
 		Type:        dep.GetType(),
 		Namespace:   dep.GetNamespace(),
+		ClusterId:   dep.GetClusterId(),
 		ClusterName: dep.GetClusterName(),
 	}
 }
@@ -64,6 +65,7 @@ func convertNode(node *storage.Node) *storage.ComplianceDomain_Node {
 	return &storage.ComplianceDomain_Node{
 		Id:          node.GetId(),
 		Name:        node.GetName(),
+		ClusterId:   node.GetClusterId(),
 		ClusterName: node.GetClusterName(),
 	}
 }
