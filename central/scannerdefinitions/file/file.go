@@ -111,3 +111,13 @@ func (file *File) Open() (*os.File, time.Time, error) {
 	succeeded = true
 	return f, fi.ModTime().UTC(), nil
 }
+
+// ModTime returns the file's modification time. It performs a stat() call and
+// thus doesn't get a file descriptor.
+func (file *File) ModTime() (time.Time, error) {
+	fileInfo, err := os.Stat(file.path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return fileInfo.ModTime(), nil
+}
