@@ -144,9 +144,9 @@ func (h *httpHandler) get(w http.ResponseWriter, r *http.Request) {
 	}
 	defer utils.IgnoreError(offlineF.Close)
 
-	f, modTime := onlineF, onlineModTime
+	content, f, modTime := u.file, onlineF, onlineModTime
 	if offlineModTime.After(onlineModTime) {
-		f, modTime = offlineF, offlineModTime
+		content, f, modTime = h.offlineFile, offlineF, offlineModTime
 	}
 
 	// It is possible no offline Scanner definitions are uploaded and Central cannot reach
