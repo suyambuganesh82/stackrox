@@ -1,6 +1,7 @@
 package file
 
 import (
+	"archive/zip"
 	"io"
 	"io/fs"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stackrox/rox/pkg/utils"
+	"github.com/stackrox/scanner/pkg/ziputil"
 )
 
 const tempFilePattern = "scanner-defs-download-*"
@@ -119,5 +121,39 @@ func (file *File) ModTime() (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return fileInfo.ModTime(), nil
+	return fileInfo.ModTime().UTC(), nil
+}
+
+func (file *File) OpenFromArchive(fileName string) (*os.File, time.Time, error) {
+	// Get the archive's modification time to return with the file object.
+	modTime, err := file.ModTime()
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+
+	// Create a temporary file and remove it, keeping the file descriptor.
+	tmpFile, err := os.CreateTemp(os.TempDir(), tempFilePattern)
+	if err != nil {
+		return nil, time.Time{}, errors.Wrap(err, "creating temporary file")
+	}
+	err = os.Remove(tmpFile.Name())
+	if err != nil {
+		return nil, time.Time{}, errors.Wrap(err, "removing temporary file")
+	}
+
+	// Extract the file and copy contents to the temporary file.
+	zipReader, err := zip.OpenReader(file.path)
+	if err != nil {
+		return nil, time.Time{}, errors.Wrap(err, "opening as zip archive")
+	}
+	fileReader, err := ziputil.OpenFile(zipReader, fileName)
+	if err != nil {
+		return nil, time.Time{}, errors.Wrap(err, "extracting")
+	}
+	_, err = io.Copy(tmpFile, fileReader)
+	if err != nil {
+		return nil, time.Time{}, errors.Wrap(err, "writing to temporary file")
+	}
+	tmpFile.Seek(0, io.SeekStart)
+	return tmpFile, modTime, nil
 }

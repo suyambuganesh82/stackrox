@@ -1,9 +1,10 @@
 package file
 
 import (
+	"archive/zip"
+	"io"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -32,30 +33,86 @@ func TestFile_ModTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var file *File
 			if tt.createFile {
-				file = createFile(tt.modTime)
+				file = createFilePath(tt.modTime)
 				defer os.Remove(file.path)
 			} else {
 				file = &File{path: "something that doesn't exist"}
 			}
-			modTime, err := file.ModTime()
-			if (err == nil) != (tt.wantErr == "") {
-				t.Errorf("ModTime() error = %v, wantErr %v", err, tt.wantErr)
-				assert.Contains(t, err.Error(), tt.wantErr)
+			gotModTime, err := file.ModTime()
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr, "ModTime() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(modTime, tt.modTime) {
-				t.Errorf("ModTime() got = %v, want %v", modTime, tt.modTime)
+			assert.NoError(t, err, "OpenFromArchive() unexpected error = %v", err)
+			if err != nil {
+				t.Errorf("OpenFromArchive() unnexpected error = %v", err)
 			}
+			assert.True(t, tt.modTime.Equal(gotModTime), "ModTime() got = %v, expected = %v", gotModTime, tt.modTime)
 		})
 	}
 }
 
-func createFile(modTime time.Time) *File {
-	tmpF, err := ioutil.TempFile(os.TempDir(), "TestFile_ModTime")
+func TestFile_OpenFromArchive(t *testing.T) {
+	tests := []struct {
+		name     string
+		modTime  time.Time
+		contents string
+		fileName string
+		wantErr  string
+	}{
+		{
+			name:     "when zip archive contains the filename then extracts content with modification time",
+			modTime:  time.Unix(123456789, 0),
+			contents: "foo bar",
+			fileName: "foobar.txt",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zipFile := createZipFilePath(tt.modTime, tt.contents, tt.fileName)
+			defer os.Remove(zipFile.Path())
+			gotFile, gotModTime, err := zipFile.OpenFromArchive(tt.fileName)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr, "OpenFromArchive() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err, "OpenFromArchive() unexpected error = %v", err)
+			assert.True(t, tt.modTime.Equal(gotModTime), "OpenFromArchive() gotModTime = %v expected = %v", gotModTime, tt.modTime)
+			gotContent, err := io.ReadAll(gotFile)
+			assert.NoError(t, err, "reading file content failed")
+			assert.Equal(t, string(gotContent), tt.contents, "OpenFromArchive() gotContents = %v expected = %v", gotContent, tt.contents)
+		})
+	}
+}
+
+func createTempOSFile() *os.File {
+	tmpF, err := ioutil.TempFile(os.TempDir(), "TestFile_ModTime_*")
 	utils.Must(err)
+	return tmpF
+}
+
+func createFilePath(modTime time.Time) *File {
+	tmpF := createTempOSFile()
 	utils.Must(tmpF.Close())
 	utils.Must(os.Chtimes(tmpF.Name(), modTime, modTime))
 	return &File{
 		path: tmpF.Name(),
+	}
+}
+
+func createZipFilePath(modTime time.Time, contents, fileName string) *File {
+	zipFile := createTempOSFile()
+	zipWriter := zip.NewWriter(zipFile)
+
+	fileWriter, err := zipWriter.Create(fileName)
+	utils.Must(err)
+	_, err = fileWriter.Write([]byte(contents))
+	utils.Must(err)
+
+	utils.Must(zipWriter.Close())
+	utils.Must(zipFile.Close())
+	utils.Must(os.Chtimes(zipFile.Name(), modTime, modTime))
+	return &File{
+		path: zipFile.Name(),
 	}
 }
