@@ -655,7 +655,9 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 		routes.CustomRoute{
 			Route: scannerDefinitionsRoute,
 			Authorizer: perrpc.FromMap(map[authz.Authorizer][]string{
-				or.ScannerOr(user.With(permissions.View(resources.ScannerDefinitions))): {
+				or.SensorOrAuthorizer(
+					or.ScannerOr(
+						user.With(permissions.View(resources.ScannerDefinitions)))): {
 					routes.RPCNameForHTTP(scannerDefinitionsRoute, http.MethodGet),
 				},
 				user.With(permissions.Modify(resources.ScannerDefinitions)): {
