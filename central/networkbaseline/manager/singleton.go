@@ -25,6 +25,7 @@ func Singleton() Manager {
 				networkEntityDS.Singleton(),
 				deploymentDS.Singleton(),
 				networkPolicyDS.Singleton(),
+
 				connection.ManagerSingleton())
 		utils.CrashOnError(err)
 	})

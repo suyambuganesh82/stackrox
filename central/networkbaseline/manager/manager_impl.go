@@ -2,11 +2,15 @@ package manager
 
 import (
 	"context"
+	"time"
 
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	deploymentDS "github.com/stackrox/rox/central/deployment/datastore"
+	"github.com/stackrox/rox/central/deployment/queue"
 	"github.com/stackrox/rox/central/networkbaseline/datastore"
 	networkEntityDS "github.com/stackrox/rox/central/networkgraph/entity/datastore"
+	flowDataStore "github.com/stackrox/rox/central/networkgraph/flow/datastore"
 	networkPolicyDS "github.com/stackrox/rox/central/networkpolicies/datastore"
 	"github.com/stackrox/rox/central/role/resources"
 	"github.com/stackrox/rox/central/sensor/service/connection"
@@ -20,12 +24,17 @@ import (
 	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/networkgraph"
 	"github.com/stackrox/rox/pkg/networkgraph/networkbaseline"
+	"github.com/stackrox/rox/pkg/protoutils"
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/search"
 	"github.com/stackrox/rox/pkg/set"
 	"github.com/stackrox/rox/pkg/sync"
 	"github.com/stackrox/rox/pkg/timestamp"
 	"github.com/stackrox/rox/pkg/utils"
+)
+
+const (
+	baselineFlushTickerDuration = 5 * time.Second
 )
 
 var (
@@ -41,11 +50,15 @@ type manager struct {
 	networkEntities   networkEntityDS.EntityDataStore
 	deploymentDS      deploymentDS.DataStore
 	networkPolicyDS   networkPolicyDS.DataStore
+	flowStore         flowDataStore.FlowDataStore
 	connectionManager connection.Manager
 
 	baselinesByDeploymentID map[string]*networkbaseline.BaselineInfo
 	seenNetworkPolicies     set.Uint64Set
 	lock                    sync.Mutex
+
+	deploymentQueue     queue.DeploymentObservationQueue
+	baselineFlushTicker *time.Ticker
 }
 
 func getNewObservationPeriodEnd() timestamp.MicroTS {
@@ -224,9 +237,16 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
+	// TODO:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
+	// populate this map when I'm creating a baseline.  Though I could probably use some combination
+	// of this map vs in observation to work around that issue so the cluster delete part would be unchanged.
+
 	if _, exists := m.baselinesByDeploymentID[deploymentID]; exists {
 		return nil
 	}
+
+	// Push the new deployment on to the observation queue
+	m.deploymentQueue.Push(&queue.DeploymentObservation{DeploymentID: deploymentID, InObservation: true, ObservationEnd: getNewObservationPeriodEnd().GogoProtobuf()})
 
 	m.baselinesByDeploymentID[deploymentID] = &networkbaseline.BaselineInfo{
 		ClusterID:            clusterID,
@@ -237,16 +257,20 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 		BaselinePeers:        make(map[networkbaseline.Peer]struct{}),
 		ForbiddenPeers:       make(map[networkbaseline.Peer]struct{}),
 	}
-	return m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
+	return nil
 }
 
 func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
 	return m.processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace)
 }
 
 func (m *manager) processDeploymentDelete(deploymentID string) error {
+	// Remove the deployment from the observation queue
+	m.deploymentQueue.RemoveDeployment(deploymentID)
+
 	deletingBaseline, found := m.baselinesByDeploymentID[deploymentID]
 	if !found {
 		// Most likely a repeated call to delete. Just return
@@ -539,6 +563,11 @@ func (m *manager) ProcessBaselineLockUpdate(ctx context.Context, deploymentID st
 }
 
 func (m *manager) processPostClusterDelete(clusterID string) error {
+	// TODO:  Figure out what to do here.  will need to figure out how to remove deployments from those
+	// clusters out of the observation queue.  If this happens after the baseline is complete, simple enough to
+	// use the deletingBaselines to remove from the observation queue.  Otherwise I need to figure out which deployments
+	// match to that cluster so I can remove the ones in observation from the queue.  Or does it matter?  When the ticker
+	// ticks I shouldn't find any flows for those deployments.  But that wouldn't be clean.
 	deletingBaselines := set.NewStringSet()
 	for deploymentID, baseline := range m.baselinesByDeploymentID {
 		if baseline.ClusterID == clusterID {
@@ -581,6 +610,9 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 	}
 	// Delete from cache
 	for deploymentID := range deletingBaselines {
+		// Remove the deployment from the observation queue
+		m.deploymentQueue.RemoveDeployment(deploymentID)
+
 		delete(m.baselinesByDeploymentID, deploymentID)
 	}
 	return nil
@@ -626,12 +658,45 @@ func (m *manager) initFromStore() error {
 	})
 }
 
+func (m *manager) flushBaselineQueue() {
+	// watch that as this could have some work to do
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for {
+		// ObservationEnd is in the future so we have nothing to do at this time
+		head := m.deploymentQueue.Peek()
+		if head == nil || protoutils.After(head.ObservationEnd, types.TimestampNow()) {
+			return
+		}
+
+		// Grab the first deployment to baseline.
+		deployment := m.deploymentQueue.Pull()
+
+		// TODO:  remove
+		log.Info(deployment)
+		// TODO:  implement something here.
+		//m.addBaseline(deployment.DeploymentID)
+		// Grab flows related to deployment
+		// package them into a map of flows like comes in
+		// then simply call processFlowUpdate with the map of flows.
+	}
+}
+
+func (m *manager) flushBaselineQueuePeriodically() {
+	defer m.baselineFlushTicker.Stop()
+	for range m.baselineFlushTicker.C {
+		m.flushBaselineQueue()
+	}
+}
+
 // New returns an initialized manager, and starts the manager's processing loop in the background.
 func New(
 	ds datastore.DataStore,
 	networkEntities networkEntityDS.EntityDataStore,
 	deploymentDS deploymentDS.DataStore,
 	networkPolicyDS networkPolicyDS.DataStore,
+	flowStore flowDataStore.FlowDataStore,
 	connectionManager connection.Manager,
 ) (Manager, error) {
 	m := &manager{
@@ -639,8 +704,11 @@ func New(
 		networkEntities:     networkEntities,
 		deploymentDS:        deploymentDS,
 		networkPolicyDS:     networkPolicyDS,
+		flowStore:           flowStore,
 		connectionManager:   connectionManager,
 		seenNetworkPolicies: set.NewUint64Set(),
+		deploymentQueue:     queue.New(),
+		baselineFlushTicker: time.NewTicker(baselineFlushTickerDuration),
 	}
 	if err := m.initFromStore(); err != nil {
 		return nil, err
