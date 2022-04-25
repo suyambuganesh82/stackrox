@@ -60,7 +60,7 @@ func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 	// Proxy relevant headers.
-	headersToProxy := set.NewFrozenStringSet("If-Modified-Since")
+	headersToProxy := set.NewFrozenStringSet("Last-Modified")
 	for _, headerName := range headersToProxy.AsSlice() {
 		centralRequest.Header.Set(headerName, request.Header.Get(headerName))
 	}
@@ -76,5 +76,6 @@ func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, reques
 			writer.Header().Set(k, v)
 		}
 	}
+	writer.WriteHeader(resp.StatusCode)
 	io.Copy(writer, resp.Body)
 }
