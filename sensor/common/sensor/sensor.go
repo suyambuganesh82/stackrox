@@ -12,6 +12,7 @@ import (
 	"github.com/stackrox/rox/pkg/clientconn"
 	"github.com/stackrox/rox/pkg/concurrency"
 	"github.com/stackrox/rox/pkg/env"
+	"github.com/stackrox/rox/pkg/features"
 	pkgGRPC "github.com/stackrox/rox/pkg/grpc"
 	"github.com/stackrox/rox/pkg/grpc/authn"
 	serviceAuthn "github.com/stackrox/rox/pkg/grpc/authn/service"
@@ -30,6 +31,7 @@ import (
 	"github.com/stackrox/rox/sensor/common/config"
 	"github.com/stackrox/rox/sensor/common/detector"
 	"github.com/stackrox/rox/sensor/common/image"
+	"github.com/stackrox/rox/sensor/common/scannerdefinitions"
 )
 
 const (
@@ -167,6 +169,15 @@ func (s *Sensor) Start() {
 		customRoutes = append(customRoutes, koCacheRoute)
 	}
 
+	// Enable endpoint to retrieve vulnerability definitions if local image scanning is enabled.
+	if features.LocalImageScanning.Enabled() {
+		route, err := newScannerDefinitionsRoute(s.centralEndpoint)
+		if err != nil {
+			log.Panicf("error creating scanner definition route: %v", err)
+		}
+		customRoutes = append(customRoutes, *route)
+	}
+
 	// Create grpc server with custom routes
 	mtlsServiceIDExtractor, err := serviceAuthn.NewExtractor()
 	if err != nil {
@@ -218,6 +229,21 @@ func (s *Sensor) Start() {
 		return
 	}
 	go s.communicationWithCentral(&centralReachable)
+}
+
+// newScannerDefinitionsRoute returns a custom route that serves scanner
+// definitions retrieved from Central.
+func newScannerDefinitionsRoute(centralEndpoint string) (*routes.CustomRoute, error) {
+	handler, err := scannerdefinitions.NewDefinitionsHandler(centralEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &routes.CustomRoute{
+		Route:         "/scanner/definitions",
+		Authorizer:    idcheck.ScannerOnly(),
+		Compression:   true,
+		ServerHandler: handler,
+	}, nil
 }
 
 func (s *Sensor) gRPCConnectToCentralWithRetries(signal *concurrency.Signal) {
