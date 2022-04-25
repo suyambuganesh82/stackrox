@@ -46,10 +46,20 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 		name         string
 		args         args
 		responseBody string
+		statusCode   int
 	}{
 		{
-			name:         "happy case",
+			name:         "when central replies 200 with content then writer matches",
+			statusCode:   200,
 			responseBody: "the foobar body.",
+			args: args{
+				writer: NewMockResponseWriter(),
+			},
+		},
+		{
+			name:         "when central replies 304 then writer matches",
+			statusCode:   304,
+			responseBody: "",
 			args: args{
 				writer: NewMockResponseWriter(),
 			},
@@ -63,7 +73,7 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 						assert.Equal(t, "bar=1&foo=2", req.URL.RawQuery)
 						assert.Equal(t, []string{"1209"}, req.Header["If-Modified-Since"])
 						return &http.Response{
-							StatusCode: 200,
+							StatusCode: tt.statusCode,
 							Body:       ioutil.NopCloser(bytes.NewBufferString(tt.responseBody)),
 						}, nil
 					}),
@@ -74,6 +84,7 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 				Header: map[string][]string{"If-Modified-Since": []string{"1209"}},
 			})
 			assert.Equal(t, tt.responseBody, tt.args.writer.String())
+			assert.Equal(t, tt.statusCode, tt.args.writer.statusCode)
 		})
 	}
 }
