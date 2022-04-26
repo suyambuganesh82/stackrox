@@ -134,7 +134,7 @@ func (h *httpHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer f.Close()
+	defer utils.IgnoreError(f.Close)
 
 	// If `file` was provided, extract from definitions' bundle to a
 	// temporary file and serve that instead.
@@ -353,7 +353,7 @@ func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "opening zip archive")
 	}
-	defer zipReader.Close()
+	defer utils.IgnoreError(zipReader.Close)
 
 	// Create a temporary file and remove it, keeping the file descriptor.
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "definitions-*.d")
@@ -375,13 +375,16 @@ func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "extracting")
 	}
-	defer fileReader.Close()
+	defer utils.IgnoreError(fileReader.Close)
 	_, err = io.Copy(tmpFile, fileReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "writing to temporary file")
 	}
 
 	// Reset for caller's convenience.
-	tmpFile.Seek(0, io.SeekStart)
+	_, err = tmpFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, errors.Wrap(err, "writing to temporary file")
+	}
 	return tmpFile, nil
 }
