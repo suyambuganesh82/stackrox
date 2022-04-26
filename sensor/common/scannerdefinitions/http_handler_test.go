@@ -80,6 +80,7 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 				},
 			}
 			h.ServeHTTP(tt.args.writer, &http.Request{
+				Method: http.MethodGet,
 				URL:    &url.URL{RawQuery: "bar=1&foo=2"},
 				Header: map[string][]string{"If-Modified-Since": {"1209"}},
 			})
