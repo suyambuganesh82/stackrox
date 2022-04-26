@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stackrox/rox/pkg/httputil"
 	"github.com/stackrox/rox/pkg/set"
+	"github.com/stackrox/rox/pkg/utils"
 	mtls2 "github.com/stackrox/scanner/pkg/mtls"
 	"google.golang.org/grpc/codes"
 )
@@ -46,15 +47,20 @@ func NewDefinitionsHandler(centralHost string) (http.Handler, error) {
 }
 
 func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Validate request.
+	if request.Method != http.MethodGet {
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	// Prepare the Central's request, proxy relevant headers and all parameters.
-	centralUrl := url.URL{
+	centralURL := url.URL{
 		Scheme:   "https",
 		Host:     h.centralHost,
 		Path:     "api/extensions/scannerdefinitions",
 		RawQuery: request.URL.Query().Encode(),
 	}
 	centralRequest, err := http.NewRequestWithContext(
-		request.Context(), http.MethodGet, centralUrl.String(), nil)
+		request.Context(), http.MethodGet, centralURL.String(), nil)
 	if err != nil {
 		httputil.WriteGRPCStyleErrorf(writer, codes.Internal, "failed to create request: %v", err)
 		return
@@ -70,12 +76,16 @@ func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, reques
 		httputil.WriteGRPCStyleErrorf(writer, codes.Internal, "failed to contact central: %v", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer utils.IgnoreError(resp.Body.Close)
 	for k, vs := range resp.Header {
 		for _, v := range vs {
 			writer.Header().Set(k, v)
 		}
 	}
 	writer.WriteHeader(resp.StatusCode)
-	io.Copy(writer, resp.Body)
+	_, err = io.Copy(writer, resp.Body)
+	if err != nil {
+		httputil.WriteGRPCStyleErrorf(writer, codes.Internal, "failed write response: %v", err)
+		return
+	}
 }
