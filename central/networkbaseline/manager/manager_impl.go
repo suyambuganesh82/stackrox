@@ -65,6 +65,9 @@ func getNewObservationPeriodEnd() timestamp.MicroTS {
 	return timestamp.Now().Add(env.NetworkBaselineObservationPeriod.DurationSetting())
 }
 
+// TODO SHREWS:  So update when one of the deployments is in observation AND not user locked.  This method may be OK.
+// Will need to walk through it when done.
+// What do I do if one deployment has an unlocked user baseline and the other is still in observation with no baseline.
 func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS timestamp.MicroTS) bool {
 	var atLeastOneBaselineInObservationPeriod bool
 	for _, entity := range []*networkgraph.Entity{&conn.SrcEntity, &conn.DstEntity} {
@@ -237,7 +240,7 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
-	// TODO:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
+	// TODO SHREWS:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
 	// populate this map when I'm creating a baseline.  Though I could probably use some combination
 	// of this map vs in observation to work around that issue so the cluster delete part would be unchanged.
 
@@ -563,7 +566,7 @@ func (m *manager) ProcessBaselineLockUpdate(ctx context.Context, deploymentID st
 }
 
 func (m *manager) processPostClusterDelete(clusterID string) error {
-	// TODO:  Figure out what to do here.  will need to figure out how to remove deployments from those
+	// TODO SHREWS:  Figure out what to do here.  will need to figure out how to remove deployments from those
 	// clusters out of the observation queue.  If this happens after the baseline is complete, simple enough to
 	// use the deletingBaselines to remove from the observation queue.  Otherwise I need to figure out which deployments
 	// match to that cluster so I can remove the ones in observation from the queue.  Or does it matter?  When the ticker
@@ -673,9 +676,9 @@ func (m *manager) flushBaselineQueue() {
 		// Grab the first deployment to baseline.
 		deployment := m.deploymentQueue.Pull()
 
-		// TODO:  remove
+		// TODO SHREWS:  remove
 		log.Info(deployment)
-		// TODO:  implement something here.
+		// TODO SHREWS:  implement something here.
 		//m.addBaseline(deployment.DeploymentID)
 		// Grab flows related to deployment
 		// package them into a map of flows like comes in

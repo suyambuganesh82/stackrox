@@ -53,6 +53,20 @@ func (s *flowStoreImpl) GetMatchingFlows(ctx context.Context, pred func(*storage
 	return flows, ts, err
 }
 
+func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID string) ([]*storage.NetworkFlow, error) {
+	defer metrics.SetRocksDBOperationDurationTime(time.Now(), ops.GetMany, "NetworkFlow")
+	if err := s.db.IncRocksDBInProgressOps(); err != nil {
+		return nil, err
+	}
+	defer s.db.DecRocksDBInProgressOps()
+
+	// Need to build a pred function that checks for deploymentID and type deployment
+	// Need to figure out what to do with since.
+	flows, _, err := s.readFlows(nil, nil)
+
+	return flows, err
+}
+
 // UpsertFlows updates an flow to the store, adding it if not already present.
 func (s *flowStoreImpl) UpsertFlows(ctx context.Context, flows []*storage.NetworkFlow, lastUpdatedTS timestamp.MicroTS) error {
 	defer metrics.SetRocksDBOperationDurationTime(time.Now(), ops.UpsertAll, "NetworkFlow")

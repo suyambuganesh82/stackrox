@@ -71,6 +71,7 @@ func (s *serviceImpl) GetNetworkBaselineStatusForFlows(
 	return &v1.NetworkBaselineStatusResponse{Statuses: statuses}, nil
 }
 
+// TODO SHREWS: Probably going to need another method and endpoint similar to process baselines.
 func (s *serviceImpl) GetNetworkBaseline(
 	ctx context.Context,
 	request *v1.ResourceByID,
