@@ -312,10 +312,11 @@ func (h *httpHandler) cleanupUpdaters(cleanupAge time.Duration) {
 // online, otherwise fallback to the manually uploaded definitions. The file
 // object can be `nil` if the definitions file does not exist, rather than
 // returning an error.
-func (h *httpHandler) openMostRecentDefinitions(uuid string) (*os.File, time.Time, error) {
+func (h *httpHandler) openMostRecentDefinitions(uuid string) (file *os.File, modTime time.Time, err error) {
 	// If in offline mode or uuid is not provided, default to the offline file.
 	if !h.online || uuid == "" {
-		return h.offlineFile.Open()
+		file, modTime, err = h.offlineFile.Open()
+		return
 	}
 
 	// Start the updater, can be called multiple times for the same uuid, but will
@@ -327,20 +328,26 @@ func (h *httpHandler) openMostRecentDefinitions(uuid string) (*os.File, time.Tim
 	// Open both the "online" and "offline", and save their modification times.
 	onlineFile, onlineTime, err := u.file.Open()
 	if err != nil {
-		return nil, time.Time{}, err
+		return
 	}
 	offlineFile, offlineTime, err := h.offlineFile.Open()
 	if err != nil {
-		return nil, time.Time{}, err
+		onlineFile.Close()
+		return
 	}
 
 	// Return the most recent file, notice that if both don't exist, nil is returned
 	// since modification time will be zero.
-	file, modTime := onlineFile, onlineTime
+
 	if offlineTime.After(onlineTime) {
 		file, modTime = offlineFile, offlineTime
+		onlineFile.Close()
+	} else {
+		file, modTime = onlineFile, onlineTime
+		offlineFile.Close()
 	}
-	return file, modTime, nil
+
+	return
 }
 
 // openFromArchive returns a file object for a name within the definitions
