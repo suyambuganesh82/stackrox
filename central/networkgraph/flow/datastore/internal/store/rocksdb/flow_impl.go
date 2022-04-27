@@ -11,6 +11,7 @@ import (
 	"github.com/stackrox/rox/central/networkgraph/flow/datastore/internal/store/common"
 	"github.com/stackrox/rox/generated/storage"
 	ops "github.com/stackrox/rox/pkg/metrics"
+	"github.com/stackrox/rox/pkg/networkgraph"
 	"github.com/stackrox/rox/pkg/rocksdb"
 	generic "github.com/stackrox/rox/pkg/rocksdb/crud"
 	"github.com/stackrox/rox/pkg/timestamp"
@@ -60,9 +61,25 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	}
 	defer s.db.DecRocksDBInProgressOps()
 
-	// Need to build a pred function that checks for deploymentID and type deployment
-	// Need to figure out what to do with since.
-	flows, _, err := s.readFlows(nil, nil)
+	// Function to match flows referencing the deployment ID passed in.
+	pred := func(props *storage.NetworkFlowProperties) bool {
+		srcEnt := props.GetSrcEntity()
+		dstEnt := props.GetDstEntity()
+
+		// Exclude all flows having both external endpoints. Although if one endpoint is an invisible external source,
+		// we still want to show the flow  given that the other endpoint is visible, however, attribute it to INTERNET.
+		if networkgraph.AllExternal(srcEnt, dstEnt) {
+			return false
+		}
+
+		srcMatch := srcEnt.GetType() == storage.NetworkEntityInfo_DEPLOYMENT && srcEnt.GetId() == deploymentID
+		dstMatch := dstEnt.GetType() == storage.NetworkEntityInfo_DEPLOYMENT && dstEnt.GetId() == deploymentID
+
+		return srcMatch || dstMatch
+	}
+
+	// TODO SHREWS: Need to figure out what to do with since.
+	flows, _, err := s.readFlows(pred, nil)
 
 	return flows, err
 }

@@ -48,7 +48,10 @@ const (
 	getSinceStmt         = "SELECT nf.Props_SrcEntity_Type, nf.Props_SrcEntity_Id, nf.Props_DstEntity_Type, nf.Props_DstEntity_Id, nf.Props_DstPort, nf.Props_L4Protocol, nf.LastSeenTimestamp, nf.ClusterId FROM networkflow nf " + joinStmt + " WHERE (nf.LastSeenTimestamp >= $1 OR nf.LastSeenTimestamp IS NULL) AND nf.ClusterId = $2"
 	deleteDeploymentStmt = "DELETE FROM networkflow WHERE ClusterId = $1 AND ((Props_SrcEntity_Type = 1 AND Props_SrcEntity_Id = $2) OR (Props_DstEntity_Type = 1 AND Props_DstEntity_Id = $2))"
 
+	// TODO SHREWS:
 	// This might be SLOW
+	// Need to run analyze on it.  Also may be better to hit 1 query for destination and a separate one for src to hit the indexes.
+	// Could also move some of the logic to the join so the records are reduced more quickly.
 	getByDeploymentStmt = "SELECT nf.Props_SrcEntity_Type, nf.Props_SrcEntity_Id, nf.Props_DstEntity_Type, nf.Props_DstEntity_Id, nf.Props_DstPort, nf.Props_L4Protocol, nf.LastSeenTimestamp, nf.ClusterId FROM networkflow nf " + joinStmt +
 		" WHERE ((nf.Props_SrcEntity_Type = 1 AND nf.Props_SrcEntity_Id = $1) OR (nf.Props_DstEntity_Type = 1 AND nf.Props_DstEntity_Id = $1)) AND nf.ClusterId = $2"
 )
@@ -573,6 +576,10 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	var err error
 
 	// TODO SHREWS:  figure out if I need to do something with that stupid time.
+	log.Info("SHREWS -- GetFlowsForDeployment")
+	log.Info(getByDeploymentStmt)
+	log.Info(deploymentID)
+	log.Info(s.clusterID)
 	rows, err = s.db.Query(ctx, getByDeploymentStmt, deploymentID, s.clusterID)
 
 	if err != nil {

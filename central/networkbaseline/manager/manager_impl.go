@@ -10,7 +10,7 @@ import (
 	"github.com/stackrox/rox/central/deployment/queue"
 	"github.com/stackrox/rox/central/networkbaseline/datastore"
 	networkEntityDS "github.com/stackrox/rox/central/networkgraph/entity/datastore"
-	flowDataStore "github.com/stackrox/rox/central/networkgraph/flow/datastore"
+	networkFlowDS "github.com/stackrox/rox/central/networkgraph/flow/datastore"
 	networkPolicyDS "github.com/stackrox/rox/central/networkpolicies/datastore"
 	"github.com/stackrox/rox/central/role/resources"
 	"github.com/stackrox/rox/central/sensor/service/connection"
@@ -50,15 +50,15 @@ type manager struct {
 	networkEntities   networkEntityDS.EntityDataStore
 	deploymentDS      deploymentDS.DataStore
 	networkPolicyDS   networkPolicyDS.DataStore
-	flowStore         flowDataStore.FlowDataStore
+	clusterFlows      networkFlowDS.ClusterDataStore
 	connectionManager connection.Manager
 
 	baselinesByDeploymentID map[string]*networkbaseline.BaselineInfo
 	seenNetworkPolicies     set.Uint64Set
 	lock                    sync.Mutex
 
-	deploymentQueue     queue.DeploymentObservationQueue
-	baselineFlushTicker *time.Ticker
+	deploymentObservationQueue queue.DeploymentObservationQueue
+	baselineFlushTicker        *time.Ticker
 }
 
 func getNewObservationPeriodEnd() timestamp.MicroTS {
@@ -249,17 +249,16 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 	}
 
 	// Push the new deployment on to the observation queue
-	m.deploymentQueue.Push(&queue.DeploymentObservation{DeploymentID: deploymentID, InObservation: true, ObservationEnd: getNewObservationPeriodEnd().GogoProtobuf()})
+	m.deploymentObservationQueue.Push(
+		&queue.DeploymentObservation{
+			DeploymentID:   deploymentID,
+			DeploymentName: deploymentName,
+			ClusterID:      clusterID,
+			Namespace:      namespace,
+			InObservation:  true,
+			ObservationEnd: getNewObservationPeriodEnd().GogoProtobuf(),
+		})
 
-	m.baselinesByDeploymentID[deploymentID] = &networkbaseline.BaselineInfo{
-		ClusterID:            clusterID,
-		Namespace:            namespace,
-		DeploymentName:       deploymentName,
-		ObservationPeriodEnd: getNewObservationPeriodEnd(),
-		UserLocked:           false,
-		BaselinePeers:        make(map[networkbaseline.Peer]struct{}),
-		ForbiddenPeers:       make(map[networkbaseline.Peer]struct{}),
-	}
 	return nil
 }
 
@@ -272,7 +271,7 @@ func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterI
 
 func (m *manager) processDeploymentDelete(deploymentID string) error {
 	// Remove the deployment from the observation queue
-	m.deploymentQueue.RemoveDeployment(deploymentID)
+	m.deploymentObservationQueue.RemoveDeployment(deploymentID)
 
 	deletingBaseline, found := m.baselinesByDeploymentID[deploymentID]
 	if !found {
@@ -614,7 +613,7 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 	// Delete from cache
 	for deploymentID := range deletingBaselines {
 		// Remove the deployment from the observation queue
-		m.deploymentQueue.RemoveDeployment(deploymentID)
+		m.deploymentObservationQueue.RemoveDeployment(deploymentID)
 
 		delete(m.baselinesByDeploymentID, deploymentID)
 	}
@@ -662,27 +661,17 @@ func (m *manager) initFromStore() error {
 }
 
 func (m *manager) flushBaselineQueue() {
-	// watch that as this could have some work to do
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	for {
 		// ObservationEnd is in the future so we have nothing to do at this time
-		head := m.deploymentQueue.Peek()
+		head := m.deploymentObservationQueue.Peek()
 		if head == nil || protoutils.After(head.ObservationEnd, types.TimestampNow()) {
 			return
 		}
 
 		// Grab the first deployment to baseline.
-		deployment := m.deploymentQueue.Pull()
+		deployment := m.deploymentObservationQueue.Pull()
 
-		// TODO SHREWS:  remove
-		log.Info(deployment)
-		// TODO SHREWS:  implement something here.
-		//m.addBaseline(deployment.DeploymentID)
-		// Grab flows related to deployment
-		// package them into a map of flows like comes in
-		// then simply call processFlowUpdate with the map of flows.
+		m.addBaseline(deployment.DeploymentID, deployment.DeploymentName, deployment.ClusterID, deployment.Namespace, timestamp.FromProtobuf(deployment.ObservationEnd))
 	}
 }
 
@@ -693,25 +682,87 @@ func (m *manager) flushBaselineQueuePeriodically() {
 	}
 }
 
+func (m *manager) getFlowStore(ctx context.Context, clusterID string) (networkFlowDS.FlowDataStore, error) {
+	flowStore, err := m.clusterFlows.GetFlowStore(ctx, clusterID)
+	if err != nil {
+		return nil, errors.Errorf("could not obtain flows for cluster %s: %v", clusterID, err)
+	}
+	if flowStore == nil {
+		return nil, errors.Wrapf(errox.NotFound, "no flows found for cluster %s", clusterID)
+	}
+	return flowStore, nil
+}
+
+func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace string, observationEnd timestamp.MicroTS) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	flowStore, err := m.getFlowStore(managerCtx, clusterID)
+
+	// Create an empty baseline entry in the map.  This will put this deployment in a state where it will be updated until
+	// its observation end time.
+	m.baselinesByDeploymentID[deploymentID] = &networkbaseline.BaselineInfo{
+		ClusterID:            clusterID,
+		Namespace:            namespace,
+		DeploymentName:       deploymentName,
+		ObservationPeriodEnd: observationEnd,
+		UserLocked:           false,
+		BaselinePeers:        make(map[networkbaseline.Peer]struct{}),
+		ForbiddenPeers:       make(map[networkbaseline.Peer]struct{}),
+	}
+
+	// Grab flows related to deployment
+	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
+	if err != nil {
+		// TODO SHREWS:  Should probably log or do something here.
+		log.Error(err)
+		return
+	}
+	// package them into a map of flows like comes in
+	// when packaging the flows up in that map, I think the timestamp has to be now
+	flowMap := putFlowsInMap(flows)
+
+	// then simply call processFlowUpdate with the map of flows.
+	err = m.processFlowUpdate(flowMap)
+
+	// TODO SHREWS:  figure out if I want to do anything with error
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgraph.NetworkConnIndicator]timestamp.MicroTS {
+	out := make(map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, len(newFlows))
+	now := timestamp.Now()
+	for _, newFlow := range newFlows {
+		t := timestamp.FromProtobuf(newFlow.LastSeenTimestamp)
+		if newFlow.LastSeenTimestamp != nil {
+			t = now
+		}
+		out[networkgraph.GetNetworkConnIndicator(newFlow)] = t
+	}
+	return out
+}
+
 // New returns an initialized manager, and starts the manager's processing loop in the background.
 func New(
 	ds datastore.DataStore,
 	networkEntities networkEntityDS.EntityDataStore,
 	deploymentDS deploymentDS.DataStore,
 	networkPolicyDS networkPolicyDS.DataStore,
-	flowStore flowDataStore.FlowDataStore,
+	clusterFlows networkFlowDS.ClusterDataStore,
 	connectionManager connection.Manager,
 ) (Manager, error) {
 	m := &manager{
-		ds:                  ds,
-		networkEntities:     networkEntities,
-		deploymentDS:        deploymentDS,
-		networkPolicyDS:     networkPolicyDS,
-		flowStore:           flowStore,
-		connectionManager:   connectionManager,
-		seenNetworkPolicies: set.NewUint64Set(),
-		deploymentQueue:     queue.New(),
-		baselineFlushTicker: time.NewTicker(baselineFlushTickerDuration),
+		ds:                         ds,
+		networkEntities:            networkEntities,
+		deploymentDS:               deploymentDS,
+		networkPolicyDS:            networkPolicyDS,
+		clusterFlows:               clusterFlows,
+		connectionManager:          connectionManager,
+		seenNetworkPolicies:        set.NewUint64Set(),
+		deploymentObservationQueue: queue.New(),
+		baselineFlushTicker:        time.NewTicker(baselineFlushTickerDuration),
 	}
 	if err := m.initFromStore(); err != nil {
 		return nil, err

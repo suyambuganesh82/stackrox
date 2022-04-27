@@ -10,6 +10,9 @@ import (
 // DeploymentObservation struct used as element in the queue
 type DeploymentObservation struct {
 	DeploymentID   string
+	DeploymentName string
+	ClusterID      string
+	Namespace      string
 	InObservation  bool
 	ObservationEnd *types.Timestamp
 }

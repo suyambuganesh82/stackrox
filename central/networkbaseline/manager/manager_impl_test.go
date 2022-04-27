@@ -10,6 +10,7 @@ import (
 	deploymentMocks "github.com/stackrox/rox/central/deployment/datastore/mocks"
 	"github.com/stackrox/rox/central/networkbaseline/datastore"
 	networkEntityDSMock "github.com/stackrox/rox/central/networkgraph/entity/datastore/mocks"
+	networkFlowDSMocks "github.com/stackrox/rox/central/networkgraph/flow/datastore/mocks"
 	networkPolicyMocks "github.com/stackrox/rox/central/networkpolicies/datastore/mocks"
 	"github.com/stackrox/rox/central/role/resources"
 	connectionMocks "github.com/stackrox/rox/central/sensor/service/connection/mocks"
@@ -84,6 +85,8 @@ type ManagerTestSuite struct {
 	networkEntities   *networkEntityDSMock.MockEntityDataStore
 	deploymentDS      *deploymentMocks.MockDataStore
 	networkPolicyDS   *networkPolicyMocks.MockDataStore
+	clusterFlows      *networkFlowDSMocks.MockClusterDataStore
+	flowStore         *networkFlowDSMocks.MockFlowDataStore
 	connectionManager *connectionMocks.MockManager
 
 	m             Manager
@@ -98,6 +101,8 @@ func (suite *ManagerTestSuite) SetupTest() {
 	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.deploymentDS = deploymentMocks.NewMockDataStore(suite.mockCtrl)
 	suite.networkPolicyDS = networkPolicyMocks.NewMockDataStore(suite.mockCtrl)
+	suite.clusterFlows = networkFlowDSMocks.NewMockClusterDataStore(suite.mockCtrl)
+	suite.flowStore = networkFlowDSMocks.NewMockFlowDataStore(suite.mockCtrl)
 	suite.connectionManager = connectionMocks.NewMockManager(suite.mockCtrl)
 }
 
@@ -112,7 +117,7 @@ func (suite *ManagerTestSuite) mustInitManager(initialBaselines ...*storage.Netw
 		suite.ds.baselines[baseline.GetDeploymentId()] = baseline
 	}
 	var err error
-	suite.m, err = New(suite.ds, suite.networkEntities, suite.deploymentDS, suite.networkPolicyDS, suite.connectionManager)
+	suite.m, err = New(suite.ds, suite.networkEntities, suite.deploymentDS, suite.networkPolicyDS, suite.clusterFlows, suite.connectionManager)
 	suite.Require().NoError(err)
 }
 
