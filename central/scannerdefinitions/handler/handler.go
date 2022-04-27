@@ -310,7 +310,7 @@ func (h *httpHandler) cleanupUpdaters(cleanupAge time.Duration) {
 // openMostRecentDefinitions opens the latest Scanner Definitions based on
 // modification time. It's either the one selected by `uuid` if present and
 // online, otherwise fallback to the manually uploaded definitions. The file
-// object can be `nil` if the definitions file doest not exist, rather than
+// object can be `nil` if the definitions file does not exist, rather than
 // returning an error.
 func (h *httpHandler) openMostRecentDefinitions(uuid string) (*os.File, time.Time, error) {
 	// If in offline mode or uuid is not provided, default to the offline file.
