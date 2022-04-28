@@ -379,9 +379,9 @@ func GRPCConnection(dialCtx context.Context, server mtls.Subject, endpoint strin
 	return clientConnOpts.dialTLSFunc()(dialCtx, endpoint, tlsConf, allDialOpts...)
 }
 
-// NewHttpClient creates an HTTP client for the given service using the client
+// NewHTTPClient creates an HTTP client for the given service using the client
 // certificate of the calling service.
-func NewHttpClient(serviceIdentity mtls.Subject, serviceEndpoint string, timeout time.Duration) (*http.Client, error) {
+func NewHTTPClient(serviceIdentity mtls.Subject, serviceEndpoint string, timeout time.Duration) (*http.Client, error) {
 	transport, err := AuthenticatedHTTPTransport(
 		serviceEndpoint, serviceIdentity, nil, UseServiceCertToken(true))
 	if err != nil {

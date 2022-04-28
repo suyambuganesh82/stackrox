@@ -24,7 +24,7 @@ type scannerDefinitionsHandler struct {
 
 // NewDefinitionsHandler creates a new scanner definitions handler.
 func NewDefinitionsHandler(centralHost string) (http.Handler, error) {
-	client, err := clientconn.NewHttpClient(mtls.CentralSubject, centralHost, 0)
+	client, err := clientconn.NewHTTPClient(mtls.CentralSubject, centralHost, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "instantiating central HTTP transport")
 	}

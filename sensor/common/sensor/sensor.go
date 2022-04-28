@@ -107,7 +107,7 @@ func (s *Sensor) startProfilingServer() *http.Server {
 
 func createKOCacheSource(centralEndpoint string) (probeupload.ProbeSource, error) {
 	kernelObjsBaseURL := "/kernel-objects"
-	kernelObjsClient, err := clientconn.NewHttpClient(mtls.CentralSubject, centralEndpoint, 0)
+	kernelObjsClient, err := clientconn.NewHTTPClient(mtls.CentralSubject, centralEndpoint, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "instantiating central HTTP transport")
 	}

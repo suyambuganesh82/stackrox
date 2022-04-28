@@ -332,7 +332,7 @@ func (h *httpHandler) openMostRecentDefinitions(uuid string) (file *os.File, mod
 	}
 	offlineFile, offlineTime, err := h.offlineFile.Open()
 	if err != nil {
-		onlineFile.Close()
+		utils.IgnoreError(onlineFile.Close)
 		return
 	}
 
@@ -341,10 +341,10 @@ func (h *httpHandler) openMostRecentDefinitions(uuid string) (file *os.File, mod
 
 	if offlineTime.After(onlineTime) {
 		file, modTime = offlineFile, offlineTime
-		onlineFile.Close()
+		utils.IgnoreError(onlineFile.Close)
 	} else {
 		file, modTime = onlineFile, onlineTime
-		offlineFile.Close()
+		utils.IgnoreError(offlineFile.Close)
 	}
 
 	return
