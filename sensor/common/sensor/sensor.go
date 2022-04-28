@@ -107,16 +107,10 @@ func (s *Sensor) startProfilingServer() *http.Server {
 
 func createKOCacheSource(centralEndpoint string) (probeupload.ProbeSource, error) {
 	kernelObjsBaseURL := "/kernel-objects"
-
-	transport, err := clientconn.AuthenticatedHTTPTransport(centralEndpoint, mtls.CentralSubject, nil, clientconn.UseServiceCertToken(true))
+	kernelObjsClient, err := clientconn.NewHttpClient(mtls.CentralSubject, centralEndpoint, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "instantiating central HTTP transport")
 	}
-
-	kernelObjsClient := &http.Client{
-		Transport: transport,
-	}
-
 	return kocache.New(context.Background(), kernelObjsClient, kernelObjsBaseURL, kocache.Options{}), nil
 }
 
@@ -173,7 +167,7 @@ func (s *Sensor) Start() {
 	if features.LocalImageScanning.Enabled() {
 		route, err := newScannerDefinitionsRoute(s.centralEndpoint)
 		if err != nil {
-			log.Panicf("error creating scanner definition route: %v", err)
+			utils.Should(errors.Wrap(err, "Failed to create scanner definition route"))
 		}
 		customRoutes = append(customRoutes, *route)
 	}

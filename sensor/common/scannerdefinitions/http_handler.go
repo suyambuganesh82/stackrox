@@ -4,13 +4,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stackrox/rox/pkg/clientconn"
 	"github.com/stackrox/rox/pkg/httputil"
+	"github.com/stackrox/rox/pkg/mtls"
 	"github.com/stackrox/rox/pkg/set"
 	"github.com/stackrox/rox/pkg/utils"
-	mtls2 "github.com/stackrox/scanner/pkg/mtls"
 	"google.golang.org/grpc/codes"
 )
 
@@ -24,21 +24,9 @@ type scannerDefinitionsHandler struct {
 
 // NewDefinitionsHandler creates a new scanner definitions handler.
 func NewDefinitionsHandler(centralHost string) (http.Handler, error) {
-	// Set up an HTTP client for Central.
-	clientConfig, err := mtls2.TLSClientConfigForCentral()
+	client, err := clientconn.NewHttpClient(mtls.CentralSubject, centralHost, 0)
 	if err != nil {
-		return nil, errors.Wrap(err, "generating TLS client config for Central")
-	}
-	client := &http.Client{
-		Timeout: 5 * time.Minute,
-		Transport: &http.Transport{
-			TLSClientConfig: clientConfig,
-			// Values are taken from http.DefaultTransport, Go 1.17.3
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
+		return nil, errors.Wrap(err, "instantiating central HTTP transport")
 	}
 	return &scannerDefinitionsHandler{
 		centralClient: client,
