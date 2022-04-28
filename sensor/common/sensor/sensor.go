@@ -235,7 +235,6 @@ func newScannerDefinitionsRoute(centralEndpoint string) (*routes.CustomRoute, er
 	return &routes.CustomRoute{
 		Route:         "/scanner/definitions",
 		Authorizer:    idcheck.ScannerOnly(),
-		Compression:   true,
 		ServerHandler: handler,
 	}, nil
 }

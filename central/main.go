@@ -665,7 +665,7 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 				},
 			}),
 			ServerHandler: scannerDefinitionsHandler.Singleton(),
-			Compression:   false,
+			Compression:   true,
 		},
 	)
 
