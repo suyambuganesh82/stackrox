@@ -11,6 +11,36 @@
     "application/json"
   ],
   "paths": {
+    "/v1/networkbaseline/lazy/{id}": {
+      "get": {
+        "operationId": "NetworkBaselineService_GetLoadNetworkBaseline",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/storageNetworkBaseline"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "NetworkBaselineService"
+        ]
+      }
+    },
     "/v1/networkbaseline/{deploymentId}/peers": {
       "patch": {
         "operationId": "NetworkBaselineService_ModifyBaselineStatusForPeers",

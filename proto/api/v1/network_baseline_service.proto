@@ -76,6 +76,12 @@ message ModifyBaselineStatusForPeersRequest {
       };
     }
 
+   rpc GetLoadNetworkBaseline (ResourceByID) returns (storage.NetworkBaseline) {
+     option (google.api.http) = {
+       get: "/v1/networkbaseline/lazy/{id}"
+     };
+   }
+
     rpc ModifyBaselineStatusForPeers (ModifyBaselineStatusForPeersRequest) returns (Empty) {
         option (google.api.http) = {
             patch: "/v1/networkbaseline/{deployment_id}/peers"

@@ -26,6 +26,7 @@ type DeploymentObservationQueue interface {
 	Push(observation *DeploymentObservation)
 	RemoveDeployment(deploymentID string)
 	RemoveFromObservation(deploymentID string)
+	GetObservationDetails(deploymentID string) *DeploymentObservation
 }
 
 // deploymentObservationQueue queue for deployments in observation window
@@ -136,4 +137,19 @@ func (q *deploymentObservationQueueImpl) RemoveFromObservation(deploymentID stri
 	}
 	// Keep the deployment in the map, so we know that we have processed this deployment.
 	q.deploymentMap[deploymentID] = nil
+}
+
+// GetObservationDetails gets the observations details of the deployment
+func (q *deploymentObservationQueueImpl) GetObservationDetails(deploymentID string) *DeploymentObservation {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	// The deployment is kept in the map after it has been processed to ensure we
+	// do not process it again.  In that case the depObj will be nil
+	depObj, found := q.deploymentMap[deploymentID]
+	if !found || depObj == nil {
+		return nil
+	}
+
+	return depObj.Value.(*DeploymentObservation)
 }

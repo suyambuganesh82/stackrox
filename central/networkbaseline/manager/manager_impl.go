@@ -206,6 +206,7 @@ func (m *manager) lookUpPeerName(entity networkgraph.Entity) string {
 }
 
 func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
+	log.Info("SHREWS -- processFlowUpdate")
 	modifiedDeploymentIDs := set.NewStringSet()
 	for conn, updateTS := range flows {
 		if !m.shouldUpdate(&conn, updateTS) {
@@ -240,6 +241,7 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
+	log.Info("SHREWS -- processDeploymentCreate")
 	// TODO SHREWS:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
 	// populate this map when I'm creating a baseline.  Though I could probably use some combination
 	// of this map vs in observation to work around that issue so the cluster delete part would be unchanged.
@@ -263,6 +265,7 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 }
 
 func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
+	log.Infof("SHREWS -- ProcessDeploymentCreate -- %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -327,6 +330,7 @@ func (m *manager) ProcessDeploymentDelete(deploymentID string) error {
 }
 
 func (m *manager) ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
+	log.Info("SHREWS -- ProcessFlowUpdate")
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processFlowUpdate(flows)
@@ -676,6 +680,7 @@ func (m *manager) flushBaselineQueue() {
 }
 
 func (m *manager) flushBaselineQueuePeriodically() {
+	log.Info("SHREWS -- flushBaselineQueuePeriodically")
 	defer m.baselineFlushTicker.Stop()
 	for range m.baselineFlushTicker.C {
 		m.flushBaselineQueue()
@@ -694,6 +699,7 @@ func (m *manager) getFlowStore(ctx context.Context, clusterID string) (networkFl
 }
 
 func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace string, observationEnd timestamp.MicroTS) {
+	log.Infof("SHREWS -- addBaseline - %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -712,7 +718,14 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	}
 
 	// Grab flows related to deployment
+	// TODO SHREWS:  take this stuff out.  I just want to look at the timing
+	a := time.Now()
+
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
+
+	delta := time.Now().Sub(a)
+	log.Infof("SHREWS -- time to GetFlowsForDeployment ==> %d", delta.Milliseconds())
+
 	if err != nil {
 		// TODO SHREWS:  Should probably log or do something here.
 		log.Error(err)
@@ -729,6 +742,33 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+func (m *manager) CreateNetworkBaseline(deploymentID string) error {
+	deployment, exists, err := m.deploymentDS.GetDeployment(managerCtx, deploymentID)
+	if !exists {
+		return errors.Wrapf(errox.NotFound, "deployment with id %q does not exist", deploymentID)
+	}
+	if err != nil {
+		return nil
+	}
+
+	depDetails := m.deploymentObservationQueue.GetObservationDetails(deploymentID)
+	var t timestamp.MicroTS
+	if depDetails == nil {
+		t = timestamp.Now()
+	} else {
+		t = timestamp.FromProtobuf(depDetails.ObservationEnd)
+	}
+	// TODO SHREWS:  Think about this time.  Probably going to need to add an method or 2 to the queue.  One to get
+	// an object and one to remove it from observation.
+	// Remove from the observation queue because we are creating a baseline for this deployment
+	m.deploymentObservationQueue.RemoveFromObservation(deploymentID)
+
+	// Now build the baseline
+	m.addBaseline(deployment.GetId(), deployment.GetName(), deployment.GetClusterId(), deployment.GetNamespace(), t)
+
+	return nil
 }
 
 func putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgraph.NetworkConnIndicator]timestamp.MicroTS {
@@ -767,5 +807,9 @@ func New(
 	if err := m.initFromStore(); err != nil {
 		return nil, err
 	}
+
+	// Start the flush baseline process
+	go m.flushBaselineQueuePeriodically()
+
 	return m, nil
 }

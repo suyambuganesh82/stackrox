@@ -39,6 +39,20 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 	return m.recorder
 }
 
+// CreateNetworkBaseline mocks base method.
+func (m *MockManager) CreateNetworkBaseline(deploymentID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNetworkBaseline", deploymentID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateNetworkBaseline indicates an expected call of CreateNetworkBaseline.
+func (mr *MockManagerMockRecorder) CreateNetworkBaseline(deploymentID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNetworkBaseline", reflect.TypeOf((*MockManager)(nil).CreateNetworkBaseline), deploymentID)
+}
+
 // ProcessBaselineLockUpdate mocks base method.
 func (m *MockManager) ProcessBaselineLockUpdate(ctx context.Context, deploymentID string, lockBaseline bool) error {
 	m.ctrl.T.Helper()

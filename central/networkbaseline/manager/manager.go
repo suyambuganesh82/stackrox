@@ -14,8 +14,14 @@ import (
 // The Manager manages network baselines.
 // ALL writes to network baselines MUST go through the manager.
 type Manager interface {
-	// ProcessDeploymentCreate notifies the baseline manager of a deployment create.
+	// CreateNetworkBaseline creates a network baseline if one does not exit
 	// The baseline manager then creates a baseline for this deployment if it does not already exist.
+	// It must only be called by trusted code, since it assumes the caller has full access to modify
+	// network baselines in the datastore.
+	CreateNetworkBaseline(deploymentID string) error
+	// ProcessDeploymentCreate notifies the baseline manager of a deployment create.
+	// The baseline manager then puts the deployment into observation mode so that the baseline will be created
+	// when the observation period ends.
 	// It must only be called by trusted code, since it assumes the caller has full access to modify
 	// network baselines in the datastore.
 	ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error
