@@ -206,7 +206,7 @@ func (m *manager) lookUpPeerName(entity networkgraph.Entity) string {
 }
 
 func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
-	log.Info("SHREWS -- processFlowUpdate")
+	//log.Info("SHREWS -- processFlowUpdate")
 	modifiedDeploymentIDs := set.NewStringSet()
 	for conn, updateTS := range flows {
 		if !m.shouldUpdate(&conn, updateTS) {
@@ -241,7 +241,7 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
-	log.Info("SHREWS -- processDeploymentCreate")
+	//log.Info("SHREWS -- processDeploymentCreate")
 	// TODO SHREWS:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
 	// populate this map when I'm creating a baseline.  Though I could probably use some combination
 	// of this map vs in observation to work around that issue so the cluster delete part would be unchanged.
@@ -265,7 +265,7 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 }
 
 func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
-	log.Infof("SHREWS -- ProcessDeploymentCreate -- %s %s", deploymentID, deploymentName)
+	//log.Infof("SHREWS -- ProcessDeploymentCreate -- %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -330,7 +330,7 @@ func (m *manager) ProcessDeploymentDelete(deploymentID string) error {
 }
 
 func (m *manager) ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
-	log.Info("SHREWS -- ProcessFlowUpdate")
+	//log.Info("SHREWS -- ProcessFlowUpdate")
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.processFlowUpdate(flows)
@@ -680,7 +680,7 @@ func (m *manager) flushBaselineQueue() {
 }
 
 func (m *manager) flushBaselineQueuePeriodically() {
-	log.Info("SHREWS -- flushBaselineQueuePeriodically")
+	//log.Info("SHREWS -- flushBaselineQueuePeriodically")
 	defer m.baselineFlushTicker.Stop()
 	for range m.baselineFlushTicker.C {
 		m.flushBaselineQueue()
@@ -719,32 +719,44 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 	// Grab flows related to deployment
 	// TODO SHREWS:  take this stuff out.  I just want to look at the timing
-	a := time.Now()
+	//a := time.Now()
 
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
 
-	delta := time.Since(a)
-	log.Infof("SHREWS -- time to GetFlowsForDeployment ==> %d", delta.Milliseconds())
+	//delta := time.Since(a)
+	//log.Infof("SHREWS -- time to GetFlowsForDeployment ==> %d", delta.Milliseconds())
 
 	if err != nil {
 		// TODO SHREWS:  Should probably log or do something here.
 		log.Error(err)
 		return
 	}
-	// package them into a map of flows like comes in
-	// when packaging the flows up in that map, I think the timestamp has to be now
-	flowMap := putFlowsInMap(flows)
 
-	// then simply call processFlowUpdate with the map of flows.
-	err = m.processFlowUpdate(flowMap)
+	// If we have flows then process them.  If we don't persist an empty baseline
+	if len(flows) > 0 {
+		// package them into a map of flows like comes in
+		// when packaging the flows up in that map, I think the timestamp has to be now
+		flowMap := putFlowsInMap(flows)
 
-	// TODO SHREWS:  figure out if I want to do anything with error
-	if err != nil {
-		log.Error(err)
+		// then simply call processFlowUpdate with the map of flows.
+		err = m.processFlowUpdate(flowMap)
+
+		// TODO SHREWS:  figure out if I want to do anything with error
+		if err != nil {
+			log.Error(err)
+		}
+	} else {
+		m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
 	}
+
 }
 
 func (m *manager) CreateNetworkBaseline(deploymentID string) error {
+	// We have already created a baseline for this deployment.  Nothing necessary to do.
+	if _, found := m.baselinesByDeploymentID[deploymentID]; found {
+		return nil
+	}
+
 	deployment, exists, err := m.deploymentDS.GetDeployment(managerCtx, deploymentID)
 	if !exists {
 		return errors.Wrapf(errox.NotFound, "deployment with id %q does not exist", deploymentID)

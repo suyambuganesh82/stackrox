@@ -98,7 +98,6 @@ func (suite *ManagerTestSuite) SetupTest() {
 	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.networkEntities = networkEntityDSMock.NewMockEntityDataStore(suite.mockCtrl)
 	suite.currTestStart = timestamp.Now()
-	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.deploymentDS = deploymentMocks.NewMockDataStore(suite.mockCtrl)
 	suite.networkPolicyDS = networkPolicyMocks.NewMockDataStore(suite.mockCtrl)
 	suite.clusterFlows = networkFlowDSMocks.NewMockClusterDataStore(suite.mockCtrl)
@@ -117,6 +116,7 @@ func (suite *ManagerTestSuite) mustInitManager(initialBaselines ...*storage.Netw
 		suite.ds.baselines[baseline.GetDeploymentId()] = baseline
 	}
 	var err error
+	suite.networkPolicyDS.EXPECT().GetNetworkPolicies(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	suite.m, err = New(suite.ds, suite.networkEntities, suite.deploymentDS, suite.networkPolicyDS, suite.clusterFlows, suite.connectionManager)
 	suite.Require().NoError(err)
 }
@@ -157,9 +157,22 @@ func (suite *ManagerTestSuite) mustGetObserationPeriod(baselineID int) timestamp
 	return timestamp.FromProtobuf(baseline.GetObservationPeriodEnd())
 }
 
+// TODO SHREWS: Look over these tests and make sure I have them set up in a way that makes sense for the new paradigm
 func (suite *ManagerTestSuite) initBaselinesForDeployments(ids ...int) {
 	for _, id := range ids {
+		suite.deploymentDS.EXPECT().GetDeployment(gomock.Any(), depID(id)).Return(
+			&storage.Deployment{
+				Id:        depID(id),
+				Name:      depName(id),
+				ClusterId: clusterID(id),
+				Namespace: ns(id),
+			}, true, nil,
+		).AnyTimes()
+		suite.clusterFlows.EXPECT().GetFlowStore(gomock.Any(), clusterID(id)).Return(suite.flowStore, nil).AnyTimes()
+		suite.flowStore.EXPECT().GetFlowsForDeployment(gomock.Any(), depID(id), false).Return(nil, nil).AnyTimes()
 		suite.Require().NoError(suite.m.ProcessDeploymentCreate(depID(id), depName(id), clusterID(id), ns(id)))
+		suite.Require().NoError(suite.m.CreateNetworkBaseline(depID(id)))
+
 	}
 }
 
@@ -184,6 +197,7 @@ func (suite *ManagerTestSuite) processFlowUpdate(inObsPeriodFlows []networkgraph
 }
 
 func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkBaseline) {
+	//log.Infof("SHREWS -- assertBaselinesAre 1 %s", baselines)
 	baselinesWithoutObsPeriod := make([]*storage.NetworkBaseline, 0, len(suite.ds.baselines))
 	obsPeriodStart := suite.currTestStart.Add(env.NetworkBaselineObservationPeriod.DurationSetting())
 	// Assume that the test takes no longer than one minute.
@@ -196,6 +210,7 @@ func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkB
 		cloned.ObservationPeriodEnd = nil
 		baselinesWithoutObsPeriod = append(baselinesWithoutObsPeriod, cloned)
 	}
+	//log.Infof("SHREWS -- assertBaselinesAre 3 %s", baselinesWithoutObsPeriod)
 	suite.ElementsMatch(baselinesWithoutObsPeriod, baselines)
 }
 
@@ -323,25 +338,27 @@ func (suite *ManagerTestSuite) TestFlowsUpdate() {
 func (suite *ManagerTestSuite) TestRepeatedCreates() {
 	suite.mustInitManager()
 
+	log.Info("1")
 	suite.initBaselinesForDeployments(1, 2, 3)
 	suite.assertBaselinesAre(emptyBaseline(1), emptyBaseline(2), emptyBaseline(3))
-
+	log.Info("2")
 	suite.initBaselinesForDeployments(1) // Should be a no-op
 	suite.assertBaselinesAre(emptyBaseline(1), emptyBaseline(2), emptyBaseline(3))
-
+	log.Info("3")
 	suite.processFlowUpdate(conns(depToDepConn(1, 2, 52)), conns(depToDepConn(2, 3, 51)))
 	suite.assertBaselinesAre(
 		baselineWithPeers(1, depPeer(2, properties(false, 52))),
 		baselineWithPeers(2, depPeer(1, properties(true, 52))),
 		emptyBaseline(3),
 	)
-
+	log.Info("4")
 	suite.initBaselinesForDeployments(1) // Should be a no-op
 	suite.assertBaselinesAre(
 		baselineWithPeers(1, depPeer(2, properties(false, 52))),
 		baselineWithPeers(2, depPeer(1, properties(true, 52))),
 		emptyBaseline(3),
 	)
+	log.Info("5")
 
 }
 
