@@ -703,7 +703,7 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	flowStore, err := m.getFlowStore(managerCtx, clusterID)
+	flowStore, _ := m.getFlowStore(managerCtx, clusterID)
 
 	// Create an empty baseline entry in the map.  This will put this deployment in a state where it will be updated until
 	// its observation end time.
@@ -723,7 +723,7 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
 
-	delta := time.Now().Sub(a)
+	delta := time.Since(a)
 	log.Infof("SHREWS -- time to GetFlowsForDeployment ==> %d", delta.Milliseconds())
 
 	if err != nil {

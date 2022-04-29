@@ -572,6 +572,7 @@ func (s *flowStoreImpl) GetMatchingFlows(ctx context.Context, pred func(*storage
 
 // GetFlowsForDeployment returns the flows matching the deployment ID
 func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID string) ([]*storage.NetworkFlow, error) {
+	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.GetFlowsForDeployment, "NetworkFlow")
 	var rows pgx.Rows
 	var err error
 
