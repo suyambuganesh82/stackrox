@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ import (
 	"github.com/stackrox/rox/pkg/migrations"
 	"github.com/stackrox/rox/pkg/sync"
 	"github.com/stackrox/rox/pkg/utils"
-	"github.com/stackrox/scanner/pkg/ziputil"
 	"google.golang.org/grpc/codes"
 )
 
@@ -355,20 +355,27 @@ func (h *httpHandler) openMostRecentDefinitions(uuid string) (file *os.File, mod
 // its name is removed. Meaning once the file object is closed, the data will be
 // freed in filesystem by the OS.
 func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
-	// Open zip archive.
+	// Open zip archive and extract the fileName.
 	zipReader, err := zip.OpenReader(archiveFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "opening zip archive")
 	}
 	defer utils.IgnoreError(zipReader.Close)
+	fileReader, err := zipReader.Open(fileName)
+	if err != nil {
+		return nil, errors.Wrap(err, "extracting")
+	}
+	defer utils.IgnoreError(fileReader.Close)
 
 	// Create a temporary file and remove it, keeping the file descriptor.
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "definitions-*.d")
+	tmpDir, err := os.MkdirTemp("", definitionsBaseDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating temporary directory")
 	}
-	tmpFile, err := os.Create(filepath.Join(tmpDir, fileName))
+	tmpFile, err := os.Create(filepath.Join(tmpDir, path.Base(fileName)))
 	if err != nil {
+		// Best effort to clean.
+		_ = os.RemoveAll(tmpDir)
 		return nil, errors.Wrap(err, "opening temporary file")
 	}
 	err = os.RemoveAll(tmpDir)
@@ -378,11 +385,6 @@ func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
 
 	// Extract the file and copy contents to the temporary file, notice we
 	// intentionally don't Sync(), to benefit from filesystem caching.
-	fileReader, err := ziputil.OpenFile(zipReader, fileName)
-	if err != nil {
-		return nil, errors.Wrap(err, "extracting")
-	}
-	defer utils.IgnoreError(fileReader.Close)
 	_, err = io.Copy(tmpFile, fileReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "writing to temporary file")
