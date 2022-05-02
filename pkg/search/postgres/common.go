@@ -144,9 +144,10 @@ func standardizeQueryAndPopulatePath(q *v1.Query, schema *walker.Schema, selectT
 	for _, f := range dbFields {
 		tables = append(tables, f.Schema)
 	}
-	froms, joinsMap := getJoins(schema, tables...)
+	froms, _ := getJoins(schema, tables...)
+	joinOnConditionsByTable := map[string]string{}
 
-	queryEntry, err := compileQueryToPostgres(schema, q, dbFields, joinsMap)
+	queryEntry, err := compileQueryToPostgres(schema, q, dbFields)
 	if err != nil {
 		return nil, err
 	}
@@ -204,11 +205,10 @@ func entriesFromQueries(
 	table *walker.Schema,
 	queries []*v1.Query,
 	queryFields map[string]*walker.Field,
-	joinMap map[string]string,
 ) ([]*pgsearch.QueryEntry, error) {
 	var entries []*pgsearch.QueryEntry
 	for _, q := range queries {
-		entry, err := compileQueryToPostgres(table, q, queryFields, joinMap)
+		entry, err := compileQueryToPostgres(table, q, queryFields)
 		if err != nil {
 			return nil, err
 		}
@@ -296,18 +296,10 @@ bfsLoop:
 	return reachableFields
 }
 
-func withJoinClause(queryEntry *pgsearch.QueryEntry, dbField *walker.Field, joinMap map[string]string) {
-	if queryEntry == nil {
-		return
-	}
-	queryEntry.Where.Query = fmt.Sprintf("(%s)", stringutils.JoinNonEmpty(" and ", queryEntry.Where.Query, joinMap[dbField.Schema.Table]))
-}
-
 func compileQueryToPostgres(
 	schema *walker.Schema,
 	q *v1.Query,
 	queryFields map[string]*walker.Field,
-	joinMap map[string]string,
 ) (*pgsearch.QueryEntry, error) {
 
 	switch sub := q.GetQuery().(type) {
@@ -327,7 +319,6 @@ func compileQueryToPostgres(
 			if err != nil {
 				return nil, err
 			}
-			withJoinClause(qe, queryFields[subBQ.MatchFieldQuery.GetField()], joinMap)
 			return qe, nil
 		case *v1.BaseQuery_MatchNoneQuery:
 			return pgsearch.NewFalseQuery(), nil
@@ -342,7 +333,6 @@ func compileQueryToPostgres(
 					continue
 				}
 
-				withJoinClause(qe, queryFields[q.GetField()], joinMap)
 				entries = append(entries, qe)
 			}
 			return combineQueryEntries(entries, " and "), nil
@@ -350,19 +340,19 @@ func compileQueryToPostgres(
 			panic("unsupported")
 		}
 	case *v1.Query_Conjunction:
-		entries, err := entriesFromQueries(schema, sub.Conjunction.Queries, queryFields, joinMap)
+		entries, err := entriesFromQueries(schema, sub.Conjunction.Queries, queryFields)
 		if err != nil {
 			return nil, err
 		}
 		return combineQueryEntries(entries, " and "), nil
 	case *v1.Query_Disjunction:
-		entries, err := entriesFromQueries(schema, sub.Disjunction.Queries, queryFields, joinMap)
+		entries, err := entriesFromQueries(schema, sub.Disjunction.Queries, queryFields)
 		if err != nil {
 			return nil, err
 		}
 		return combineQueryEntries(entries, " or "), nil
 	case *v1.Query_BooleanQuery:
-		entries, err := entriesFromQueries(schema, sub.BooleanQuery.Must.Queries, queryFields, joinMap)
+		entries, err := entriesFromQueries(schema, sub.BooleanQuery.Must.Queries, queryFields)
 		if err != nil {
 			return nil, err
 		}
@@ -371,7 +361,7 @@ func compileQueryToPostgres(
 			cqe = pgsearch.NewTrueQuery()
 		}
 
-		entries, err = entriesFromQueries(schema, sub.BooleanQuery.MustNot.Queries, queryFields, joinMap)
+		entries, err = entriesFromQueries(schema, sub.BooleanQuery.MustNot.Queries, queryFields)
 		if err != nil {
 			return nil, err
 		}
