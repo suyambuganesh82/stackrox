@@ -20,7 +20,7 @@ class NetworkBaselineTest extends BaseSpecification {
     static final private String NGINX_IMAGE = "quay.io/rhacs-eng/qa:nginx-1.19-alpine"
 
     // The baseline generation duration must be changed from the default for this test to succeed.
-    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 120
+    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 240
 
     static final private int CLOCK_SKEW_ALLOWANCE_SECONDS = 15
 
@@ -47,7 +47,7 @@ class NetworkBaselineTest extends BaseSpecification {
         .setImage(NGINX_IMAGE)
         .addLabel("app", ANOMALOUS_CLIENT_DEP_NAME)
         .setCommand(["/bin/sh", "-c",])
-        .setArgs(["echo sleeping; sleep ${EXPECTED_BASELINE_DURATION_SECONDS+30}; echo sleep done; " +
+        .setArgs(["echo sleeping; date; sleep ${EXPECTED_BASELINE_DURATION_SECONDS+30}; echo sleep done; date;" +
                       "for i in \$(seq 1 10); do wget -S http://${SERVER_DEP_NAME}; sleep 1; done;" +
                       "sleep 1000" as String,])
 
@@ -105,12 +105,12 @@ class NetworkBaselineTest extends BaseSpecification {
     }
 
     @Category(NetworkBaseline)
-    @Ignore("Skip test for now, we're working on fixing it.")
+//     @Ignore("Skip test for now, we're working on fixing it.")
     def "Verify network baseline functionality"() {
         when:
         "Create initial set of deployments, wait for baseline to populate"
         def beforeDeploymentCreate = System.currentTimeSeconds()
-        batchCreate([SERVER_DEP, BASELINED_CLIENT_DEP, ANOMALOUS_CLIENT_DEP])
+        batchCreate([SERVER_DEP, BASELINED_CLIENT_DEP])
         def justAfterDeploymentCreate = System.currentTimeSeconds()
 
         def serverDeploymentID = SERVER_DEP.deploymentUid
@@ -119,12 +119,17 @@ class NetworkBaselineTest extends BaseSpecification {
         def baselinedClientDeploymentID = BASELINED_CLIENT_DEP.deploymentUid
         assert baselinedClientDeploymentID != null
 
+        assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
+
+        // Now create the anomalous deployment
+        batchCreate([ANOMALOUS_CLIENT_DEP])
+
         def anomalousClientDeploymentID = ANOMALOUS_CLIENT_DEP.deploymentUid
         assert anomalousClientDeploymentID != null
-        println "Deployment IDs Server: ${serverDeploymentID}, " +
-            "Baselined client: ${baselinedClientDeploymentID}, Anomalous client: ${anomalousClientDeploymentID}"
 
-        assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
+        println "Deployment IDs Server: ${serverDeploymentID}, " +
+                    "Baselined client: ${baselinedClientDeploymentID}, Anomalous client: ${anomalousClientDeploymentID}"
+
         assert NetworkGraphUtil.checkForEdge(anomalousClientDeploymentID, serverDeploymentID, null,
             EXPECTED_BASELINE_DURATION_SECONDS + 180)
 
