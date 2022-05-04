@@ -31,7 +31,7 @@ spec:
           app: scanner
     ports:
     - port: 443
-      protocol: TPC
+      protocol: TCP
   - ports:
     - port: 9443
       protocol: TCP

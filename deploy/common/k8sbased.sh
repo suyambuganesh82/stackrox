@@ -47,16 +47,70 @@ function hotload_binary {
   local binary_name="$1"
   local local_name="$2"
   local deployment="$3"
+  local node_type="$4"
+  local upload_only=$5
 
   echo
   echo "**********"
   echo "$binary_name binary is being hot reloaded"
   echo "**********"
   echo
-
+  set -x
   binary_path=$(realpath "$(git rev-parse --show-toplevel)/bin/linux/${local_name}")
-  kubectl -n stackrox patch "deploy/${deployment}" -p '{"spec":{"template":{"spec":{"containers":[{"name":"'${deployment}'","volumeMounts":[{"mountPath":"/stackrox/'${binary_name}'","name":"'binary-${local_name}'"}]}],"volumes":[{"hostPath":{"path":"'${binary_path}'","type":""},"name":"'binary-${local_name}'"}]}}}}'
-  kubectl -n stackrox set env "deploy/$deployment" "ROX_HOTRELOAD=true"
+
+  pod=$(kubectl get po \
+                -n stackrox \
+                -l app=${deployment} \
+                -o custom-columns=:metadata.name \
+                --no-headers)
+
+  node_name=$(kubectl -n stackrox get po ${pod} -o json | jq -r .spec.nodeName)
+  container_id=$(kubectl -n stackrox get po ${pod} -o json \
+                     | jq -r '.status.containerStatuses[] | select(.name == "'${deployment}'") | .containerID' \
+                     | sed 's@docker://@@')
+  tmp_local_name=/tmp/${local_name}
+  case ${node_type} in
+      ec2)
+          node_binary_path="/home/ec2-user/${local_name}"
+          ec2_pub=$(aws ec2 describe-instances \
+                        --filters "Name=private-dns-name,Values=${node_name}" \
+                        | jq -r '.Reservations[0].Instances[0].PublicDnsName')
+          
+          scp ${binary_path} ec2-user@${ec2_pub}:${tmp_local_name}
+          restart_cmd="rm -f ${node_binary_path} && cp ${tmp_local_name} ${node_binary_path}"
+          [[ x"${container_id}" != x"null" ]] && restart_cmd+=" && docker restart ${container_id}"
+          ssh ec2-user@${ec2_pub} ${restart_cmd}
+          ;;
+      minikube)
+          node_binary_path="/home/docker/${local_name}"
+          minikube cp ${binary_path} ${node_name}:${tmp_local_name}
+          restart_cmd="rm -f ${node_binary_path} && cp ${tmp_local_name} ${node_binary_path} && chmod +x ${node_binary_path}"
+          [[ x"${container_id}" != x"null" ]] && restart_cmd+=" && docker restart ${container_id}"
+          minikube ssh -n ${node_name} "${restart_cmd}"
+          ;;
+      openshift)
+          node_binary_path="/root/${local_name}"
+          infra_dir=$(dirname $KUBECONFIG)
+          ssh_key="$infra_dir/id_rsa"
+          ingress_host=$(
+              oc get service
+              --all-namespaces
+              -l
+              run=ssh-bastion
+              -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')
+          echo $ingress_host
+          # ssh -i "${ssh_key}" -t -o StrictHostKeyChecking=no -o ProxyCommand='ssh -i '"${ssh_key}"' -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@'"${ingress_host}" core@"$1" "sudo -i"
+          exit 1
+          ;;
+      *)
+          node_binary_path="${binary_path}"
+          ;;
+  esac
+
+  if [ -z "${upload_only}" ]; then
+      kubectl -n stackrox patch "deploy/${deployment}" -p '{"spec":{"template":{"spec":{"containers":[{"name":"'${deployment}'","volumeMounts":[{"mountPath":"/stackrox/'${binary_name}'","name":"'binary-${local_name}'"}]}],"volumes":[{"hostPath":{"path":"'${node_binary_path}'","type":""},"name":"'binary-${local_name}'"}]}}}}'
+      kubectl -n stackrox set env "deploy/$deployment" "ROX_HOTRELOAD=true"
+  fi
 }
 
 function verify_orch {
@@ -337,8 +391,10 @@ function launch_central {
       fi
     fi
 
-    if [[ "${is_local_dev}" == "true" && "${ROX_HOTRELOAD}" == "true" ]]; then
-      hotload_binary central central central
+    echo is_local_dev=${is_local_dev}
+    echo ROX_HOTRELOAD=${ROX_HOTRELOAD}
+    if [[ "${ROX_HOTRELOAD}" == "true" ]]; then
+      hotload_binary central central central minikube
     fi
 
     # Wait for any pending changes to Central deployment to get reconciled before trying to connect it.
@@ -406,6 +462,7 @@ function launch_sensor {
 
     verify_orch
 
+    echo ${MAIN_IMAGE_TAG}
     if [[ "$ADMISSION_CONTROLLER" == "true" ]]; then
       extra_config+=("--admission-controller-listen-on-creates=true")
     	extra_json_config+=', "admissionController": true'
@@ -527,7 +584,7 @@ function launch_sensor {
 
     if [[ -n "${CI}" || $(kubectl get nodes -o json | jq '.items | length') == 1 ]]; then
        if [[ "${ROX_HOTRELOAD}" == "true" ]]; then
-         hotload_binary bin/kubernetes-sensor kubernetes sensor
+         hotload_binary bin/kubernetes-sensor kubernetes sensor minikube
        fi
        if [[ -z "${IS_RACE_BUILD}" ]]; then
            kubectl -n stackrox patch deploy/sensor --patch '{"spec":{"template":{"spec":{"containers":[{"name":"sensor","resources":{"limits":{"cpu":"500m","memory":"500Mi"},"requests":{"cpu":"500m","memory":"500Mi"}}}]}}}}'
