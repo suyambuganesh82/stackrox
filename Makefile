@@ -178,7 +178,7 @@ fast-central-build:
 fast-central: deps
 	@echo "+ $@"
 	docker run --rm $(GOPATH_WD_OVERRIDES) $(LOCAL_VOLUME_ARGS) $(BUILD_IMAGE) make fast-central-build
-	@echo $(BASE_DIR)/scripts/k8s/kill-pod.sh central
+	@$(BASE_DIR)/scripts/k8s/kill-pod.sh central
 
 # fast is a dev mode options when using local dev
 # it will automatically restart Central if there are any changes
@@ -378,7 +378,8 @@ sensor-kubernetes-build-dockerized: main-builder-image
 
 .PHONY: sensor-build
 sensor-build:
-	$(GOBUILD) sensor/kubernetes
+	$(GOBUILD) sensor/kubernetes sensor/admission-control
+	CGO_ENABLED=0 $(GOBUILD) sensor/upgrader
 
 .PHONY: sensor-kubernetes-build
 sensor-kubernetes-build:
