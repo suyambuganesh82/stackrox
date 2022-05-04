@@ -23,7 +23,6 @@ var (
 	authorizer = perrpc.FromMap(map[authz.Authorizer][]string{
 		user.With(permissions.View(resources.NetworkBaseline)): {
 			"/v1.NetworkBaselineService/GetNetworkBaseline",
-			"/v1.NetworkBaselineService/GetLoadNetworkBaseline",
 			"/v1.NetworkBaselineService/GetNetworkBaselineStatusForFlows",
 		},
 		user.With(permissions.Modify(resources.NetworkBaseline)): {
@@ -73,25 +72,6 @@ func (s *serviceImpl) GetNetworkBaselineStatusForFlows(
 }
 
 func (s *serviceImpl) GetNetworkBaseline(
-	ctx context.Context,
-	request *v1.ResourceByID,
-) (*storage.NetworkBaseline, error) {
-	if request.GetId() == "" {
-		return nil, errors.Wrap(errox.InvalidArgs, "Network baseline id must be provided")
-	}
-	baseline, found, err := s.datastore.GetNetworkBaseline(ctx, request.GetId())
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, errors.Wrapf(errox.NotFound, "network baseline with id %q does not exist", request.GetId())
-	}
-
-	return baseline, nil
-}
-
-// TODO SHREWS: Probably going to need another method and endpoint similar to process baselines.
-func (s *serviceImpl) GetLoadNetworkBaseline(
 	ctx context.Context,
 	request *v1.ResourceByID,
 ) (*storage.NetworkBaseline, error) {

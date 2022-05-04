@@ -11,6 +11,7 @@ import (
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/fixtures"
 	"github.com/stackrox/rox/pkg/grpc/testutils"
+	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/testutils/envisolator"
 	"github.com/stretchr/testify/suite"
@@ -18,6 +19,8 @@ import (
 
 var (
 	allAllowedCtx = sac.WithAllAccess(context.Background())
+
+	log = logging.LoggerForModule()
 )
 
 func TestNetworkBaselineService(t *testing.T) {
@@ -137,13 +140,18 @@ func (s *NetworkBaselineServiceTestSuite) TestGetNetworkBaselineStatusForFlows()
 func (s *NetworkBaselineServiceTestSuite) TestGetNetworkBaseline() {
 	baseline := s.getBaselineWithSampleFlow()
 
-	// When no baseline, expect error
+	// When no baseline, create one
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(nil, false, nil)
-	_, err := s.service.GetNetworkBaseline(allAllowedCtx, &v1.ResourceByID{Id: baseline.GetDeploymentId()})
-	s.Error(err, "network baseline for the deployment does not exist")
+	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
+	s.manager.EXPECT().CreateNetworkBaseline(gomock.Any())
+	newBase, err := s.service.GetNetworkBaseline(allAllowedCtx, &v1.ResourceByID{Id: baseline.GetDeploymentId()})
+	log.Info("SHREWS -- just created a baseline")
+	s.True(newBase != nil)
 
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
+	log.Info("SHREWS -- second create should get a baseline")
 	rsp, err := s.service.GetNetworkBaseline(allAllowedCtx, &v1.ResourceByID{Id: baseline.GetDeploymentId()})
+	log.Info("SHREWS -- back from second create")
 	s.Nil(err)
 	s.Equal(rsp, baseline, "network baselines do not match")
 }

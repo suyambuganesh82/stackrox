@@ -113,7 +113,7 @@ export function markNetworkBaselineStatuses({ deploymentId, networkBaselines }) 
  *
  */
 export function fetchNetworkBaselines({ deploymentId }) {
-    return axios.get(`${networkBaselineBaseUrl}/lazy/${deploymentId}`).then((response) => {
+    return axios.get(`${networkBaselineBaseUrl}/${deploymentId}`).then((response) => {
         return response.data;
     });
 }
