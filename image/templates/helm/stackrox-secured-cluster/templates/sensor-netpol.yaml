@@ -22,15 +22,11 @@ spec:
       - podSelector:
           matchLabels:
             app: admission-control
+      - podSelector:
+          matchLabels:
+            app: scanner
     ports:
     - port: 8443
-      protocol: TCP
-  - from:
-    - podSelector:
-        matchLabels:
-          app: scanner
-    ports:
-    - port: 443
       protocol: TCP
   - ports:
     - port: 9443
