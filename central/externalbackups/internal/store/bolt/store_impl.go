@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/stackrox/rox/central/externalbackups/internal/store"
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/bolthelper"
 	protoCrud "github.com/stackrox/rox/pkg/bolthelper/crud/proto"
@@ -28,7 +27,7 @@ type storeImpl struct {
 }
 
 // New returns a new Node store
-func New(db *bolt.DB) store.Store {
+func New(db *bolt.DB) *storeImpl {
 	bolthelper.RegisterBucketOrPanic(db, backupBucketKey)
 
 	crud := protoCrud.NewMessageCrudForBucket(bolthelper.TopLevelRef(db, backupBucketKey), key, alloc)

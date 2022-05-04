@@ -115,7 +115,7 @@ func (s *ExternalbackupsStoreSuite) TestStore() {
 	s.NoError(store.UpsertMany(ctx, externalBackups))
 	allExternalBackup, err := store.GetAll(ctx)
 	s.NoError(err)
-	s.ElementsMatch(externalBackups, allExternalBackup)
+	s.Equal(externalBackups, allExternalBackup)
 
 	externalBackupCount, err = store.Count(ctx)
 	s.NoError(err)
