@@ -30,6 +30,7 @@ func init() {
 		&storage.ReportConfiguration{}:    resources.VulnerabilityReports,
 		&storage.SimpleAccessScope{}:      resources.Role,
 		&storage.TokenMetadata{}:          resources.APIToken,
+		&storage.ExternalBackup{}:         resources.BackupPlugins,
 		// Tests
 		&storage.TestMultiKeyStruct{}:  resources.Namespace,
 		&storage.TestSingleKeyStruct{}: resources.Namespace,
