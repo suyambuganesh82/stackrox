@@ -705,6 +705,11 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 	flowStore, _ := m.getFlowStore(managerCtx, clusterID)
 
+	// We have already created a baseline for this deployment.  Nothing necessary to do.
+	if _, found := m.baselinesByDeploymentID[deploymentID]; found {
+		return
+	}
+
 	// Create an empty baseline entry in the map.  This will put this deployment in a state where it will be updated until
 	// its observation end time.
 	m.baselinesByDeploymentID[deploymentID] = &networkbaseline.BaselineInfo{
@@ -718,14 +723,7 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	}
 
 	// Grab flows related to deployment
-	// TODO SHREWS:  take this stuff out.  I just want to look at the timing
-	//a := time.Now()
-
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
-
-	//delta := time.Since(a)
-	//log.Infof("SHREWS -- time to GetFlowsForDeployment ==> %d", delta.Milliseconds())
-
 	if err != nil {
 		// TODO SHREWS:  Should probably log or do something here.
 		log.Error(err)
@@ -752,11 +750,6 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 }
 
 func (m *manager) CreateNetworkBaseline(deploymentID string) error {
-	// We have already created a baseline for this deployment.  Nothing necessary to do.
-	if _, found := m.baselinesByDeploymentID[deploymentID]; found {
-		return nil
-	}
-
 	deployment, exists, err := m.deploymentDS.GetDeployment(managerCtx, deploymentID)
 	if !exists {
 		return errors.Wrapf(errox.NotFound, "deployment with id %q does not exist", deploymentID)
@@ -774,11 +767,13 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 	}
 	// TODO SHREWS:  Think about this time.  Probably going to need to add an method or 2 to the queue.  One to get
 	// an object and one to remove it from observation.
-	// Remove from the observation queue because we are creating a baseline for this deployment
-	m.deploymentObservationQueue.RemoveFromObservation(deploymentID)
 
 	// Now build the baseline
+	// TODO SHREWS:  return an error from this guy and use that info to determine if we should remove from observation
 	m.addBaseline(deployment.GetId(), deployment.GetName(), deployment.GetClusterId(), deployment.GetNamespace(), t)
+
+	// Remove from the observation queue because we are creating a baseline for this deployment
+	m.deploymentObservationQueue.RemoveFromObservation(deploymentID)
 
 	return nil
 }
