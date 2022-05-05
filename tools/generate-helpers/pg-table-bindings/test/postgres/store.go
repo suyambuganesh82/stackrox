@@ -11,15 +11,16 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stackrox/rox/central/metrics"
 	pkgSchema "github.com/stackrox/rox/central/postgres/schema"
+	v1 "github.com/stackrox/rox/generated/api/v1"
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/logging"
 	ops "github.com/stackrox/rox/pkg/metrics"
 	"github.com/stackrox/rox/pkg/postgres/pgutils"
+	"github.com/stackrox/rox/pkg/search/postgres"
 )
 
 const (
 	baseTable  = "singlekey"
-	countStmt  = "SELECT COUNT(*) FROM singlekey"
 	existsStmt = "SELECT EXISTS(SELECT 1 FROM singlekey WHERE Key = $1)"
 
 	getStmt     = "SELECT serialized FROM singlekey WHERE Key = $1"
@@ -47,6 +48,7 @@ type Store interface {
 	Count(ctx context.Context) (int, error)
 	Exists(ctx context.Context, key string) (bool, error)
 	Get(ctx context.Context, key string) (*storage.TestSingleKeyStruct, bool, error)
+	GetAll(ctx context.Context) ([]*storage.TestSingleKeyStruct, error)
 	Upsert(ctx context.Context, obj *storage.TestSingleKeyStruct) error
 	UpsertMany(ctx context.Context, objs []*storage.TestSingleKeyStruct) error
 	Delete(ctx context.Context, key string) error
@@ -277,12 +279,9 @@ func (s *storeImpl) UpsertMany(ctx context.Context, objs []*storage.TestSingleKe
 func (s *storeImpl) Count(ctx context.Context) (int, error) {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Count, "TestSingleKeyStruct")
 
-	row := s.db.QueryRow(ctx, countStmt)
-	var count int
-	if err := row.Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+	var sacQueryFilter *v1.Query
+
+	return postgres.RunCountRequestForSchema(schema, sacQueryFilter, s.db)
 }
 
 // Exists returns if the id exists in the store
@@ -318,6 +317,16 @@ func (s *storeImpl) Get(ctx context.Context, key string) (*storage.TestSingleKey
 		return nil, false, err
 	}
 	return &msg, true, nil
+}
+func (s *storeImpl) GetAll(ctx context.Context) ([]*storage.TestSingleKeyStruct, error) {
+	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.GetAll, "TestSingleKeyStruct")
+
+	var objs []*storage.TestSingleKeyStruct
+	err := s.Walk(ctx, func(obj *storage.TestSingleKeyStruct) error {
+		objs = append(objs, obj)
+		return nil
+	})
+	return objs, err
 }
 
 func (s *storeImpl) acquireConn(ctx context.Context, op ops.Op, typ string) (*pgxpool.Conn, func(), error) {
