@@ -14,6 +14,10 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+var (
+	headersToProxy = set.NewFrozenStringSet("If-Modified-Since", "Accept-Encoding")
+)
+
 // scannerDefinitionsHandler handles requests to retrieve scanner definitions
 // from Central.
 type scannerDefinitionsHandler struct {
@@ -54,7 +58,6 @@ func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 	// Proxy relevant headers.
-	headersToProxy := set.NewFrozenStringSet("If-Modified-Since", "Accept-Encoding")
 	for _, headerName := range headersToProxy.AsSlice() {
 		centralRequest.Header.Set(headerName, request.Header.Get(headerName))
 	}

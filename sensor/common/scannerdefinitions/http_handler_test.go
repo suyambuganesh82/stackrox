@@ -38,6 +38,11 @@ func (f transportMockFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
+	testRequest := http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{RawQuery: "bar=1&foo=2"},
+		Header: map[string][]string{"If-Modified-Since": {"1209"}, "Accept-Encoding": {""}},
+	}
 	type args struct {
 		writer  *responseWriterMock
 		request *http.Request
@@ -67,11 +72,16 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.request == nil {
+				tt.args.request = &testRequest
+			}
 			h := &scannerDefinitionsHandler{
 				centralClient: &http.Client{
 					Transport: transportMockFunc(func(req *http.Request) (*http.Response, error) {
-						assert.Equal(t, "bar=1&foo=2", req.URL.RawQuery)
-						assert.Equal(t, []string{"1209"}, req.Header["If-Modified-Since"])
+						assert.Equal(t, tt.args.request.URL.RawQuery, req.URL.RawQuery)
+						for _, header := range headersToProxy.AsSlice() {
+							assert.Equal(t, tt.args.request.Header[header], req.Header[header])
+						}
 						return &http.Response{
 							StatusCode: tt.statusCode,
 							Body:       io.NopCloser(bytes.NewBufferString(tt.responseBody)),
@@ -79,11 +89,7 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 					}),
 				},
 			}
-			h.ServeHTTP(tt.args.writer, &http.Request{
-				Method: http.MethodGet,
-				URL:    &url.URL{RawQuery: "bar=1&foo=2"},
-				Header: map[string][]string{"If-Modified-Since": {"1209"}},
-			})
+			h.ServeHTTP(tt.args.writer, tt.args.request)
 			assert.Equal(t, tt.responseBody, tt.args.writer.String())
 			assert.Equal(t, tt.statusCode, tt.args.writer.statusCode)
 		})
