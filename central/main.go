@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	alertDatastore "github.com/stackrox/rox/central/alert/datastore"
 	alertService "github.com/stackrox/rox/central/alert/service"
 	apiTokenService "github.com/stackrox/rox/central/apitoken/service"
@@ -651,6 +653,13 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 	})
 
 	scannerDefinitionsRoute := "/api/extensions/scannerdefinitions"
+	// Only grant compression to well-known content types. It should capture files
+	// worth of compression in definition's bundle. Ignore all other types (e.g.,
+	// `.zip` for the bundle itself).
+	definitionsFileGzipHandler, _ := gziphandler.GzipHandlerWithOpts(gziphandler.ContentTypes([]string{
+		mime.TypeByExtension(".json"),
+		mime.TypeByExtension(".yaml"),
+	}))
 	customRoutes = append(customRoutes,
 		routes.CustomRoute{
 			Route: scannerDefinitionsRoute,
@@ -664,8 +673,7 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 					routes.RPCNameForHTTP(scannerDefinitionsRoute, http.MethodPost),
 				},
 			}),
-			ServerHandler: scannerDefinitionsHandler.Singleton(),
-			Compression:   true,
+			ServerHandler: definitionsFileGzipHandler(scannerDefinitionsHandler.Singleton()),
 		},
 	)
 
