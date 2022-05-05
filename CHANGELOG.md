@@ -6,6 +6,8 @@ Please avoid adding duplicate information across this changelog and JIRA/doc inp
 
 ## [NEXT RELEASE]
 
+- Add `file` query parameter to Central's `/api/extensions/scannerdefinitions`, allowing retrieval of individual files from Scanner's Definition bundle.
+
 ## [70.0]
 
 - The default Admission Controller "fail open" timeout has been changed from 3 seconds to 20 seconds in Helm templates.
