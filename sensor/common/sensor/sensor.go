@@ -164,7 +164,7 @@ func (s *Sensor) Start() {
 	}
 
 	// Enable endpoint to retrieve vulnerability definitions if local image scanning is enabled.
-	if features.LocalImageScanning.Enabled() {
+	if features.LocalImageScanning.Enabled() && env.LocalImageScanningEnabled.BooleanSetting() {
 		route, err := newScannerDefinitionsRoute(s.centralEndpoint)
 		if err != nil {
 			utils.Should(errors.Wrap(err, "Failed to create scanner definition route"))
