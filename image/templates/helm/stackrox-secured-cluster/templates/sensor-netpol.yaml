@@ -22,7 +22,7 @@ spec:
       - podSelector:
           matchLabels:
             app: admission-control
-{{ if or (eq ._rox.scanner.mode "slim") ._rox.env.openshift }}
+{{ if and ._rox.env.openshift (eq ._rox.scanner.mode "slim") }}
       - podSelector:
           matchLabels:
             app: scanner
