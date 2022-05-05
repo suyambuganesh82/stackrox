@@ -14,8 +14,8 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-// scannerDefinitionsHandler handle requests to retrieve scanner vulnerability
-// definitions from Central.
+// scannerDefinitionsHandler handles requests to retrieve scanner definitions
+// from Central.
 type scannerDefinitionsHandler struct {
 	http.Handler
 	centralClient *http.Client

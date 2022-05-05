@@ -22,9 +22,11 @@ spec:
       - podSelector:
           matchLabels:
             app: admission-control
+{{ if or (eq ._rox.scanner.mode "slim") ._rox.env.openshift }}
       - podSelector:
           matchLabels:
             app: scanner
+{{ end }}
     ports:
     - port: 8443
       protocol: TCP
