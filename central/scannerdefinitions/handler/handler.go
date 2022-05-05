@@ -378,6 +378,11 @@ func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
 		_ = os.RemoveAll(tmpDir)
 		return nil, errors.Wrap(err, "opening temporary file")
 	}
+	defer func() {
+		if err != nil {
+			_ = tmpFile.Close()
+		}
+	}()
 	err = os.RemoveAll(tmpDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "removing temporary file")
