@@ -167,6 +167,7 @@ import (
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/sac/observe"
 	"github.com/stackrox/rox/pkg/sync"
+	"github.com/stackrox/rox/pkg/utils"
 	pkgVersion "github.com/stackrox/rox/pkg/version"
 )
 
@@ -656,10 +657,11 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 	// Only grant compression to well-known content types. It should capture files
 	// worth of compression in definition's bundle. Ignore all other types (e.g.,
 	// `.zip` for the bundle itself).
-	definitionsFileGzipHandler, _ := gziphandler.GzipHandlerWithOpts(gziphandler.ContentTypes([]string{
+	definitionsFileGzipHandler, err := gziphandler.GzipHandlerWithOpts(gziphandler.ContentTypes([]string{
 		mime.TypeByExtension(".json"),
 		mime.TypeByExtension(".yaml"),
 	}))
+	utils.CrashOnError(err)
 	customRoutes = append(customRoutes,
 		routes.CustomRoute{
 			Route: scannerDefinitionsRoute,
