@@ -21,7 +21,6 @@ var (
 // scannerDefinitionsHandler handles requests to retrieve scanner definitions
 // from Central.
 type scannerDefinitionsHandler struct {
-	http.Handler
 	centralClient *http.Client
 	centralHost   string
 }
