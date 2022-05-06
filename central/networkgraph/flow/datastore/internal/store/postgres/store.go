@@ -576,11 +576,10 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	var rows pgx.Rows
 	var err error
 
-	// TODO SHREWS:  figure out if I need to do something with that stupid time.
-	log.Info("SHREWS -- GetFlowsForDeployment")
-	log.Infof("SHREWS -- %s", getByDeploymentStmt)
-	log.Infof("SHREWS -- %s", deploymentID)
-	log.Infof("SHREWS -- %s", s.clusterID)
+	//log.Info("SHREWS -- GetFlowsForDeployment")
+	//log.Infof("SHREWS -- %s", getByDeploymentStmt)
+	//log.Infof("SHREWS -- %s", deploymentID)
+	//log.Infof("SHREWS -- %s", s.clusterID)
 	rows, err = s.db.Query(ctx, getByDeploymentStmt, deploymentID, s.clusterID)
 
 	if err != nil {
@@ -590,7 +589,7 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 
 	flows, err := s.readRows(rows, nil)
 
-	log.Infof("SHREWS -- GetFlowsForDeployment -- num flows => %d", len(flows))
+	//log.Infof("SHREWS -- GetFlowsForDeployment -- num flows => %d", len(flows))
 
 	return flows, err
 }

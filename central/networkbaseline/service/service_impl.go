@@ -15,6 +15,7 @@ import (
 	"github.com/stackrox/rox/pkg/grpc/authz"
 	"github.com/stackrox/rox/pkg/grpc/authz/perrpc"
 	"github.com/stackrox/rox/pkg/grpc/authz/user"
+	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/networkgraph"
 	"google.golang.org/grpc"
 )
@@ -31,6 +32,8 @@ var (
 			"/v1.NetworkBaselineService/UnlockNetworkBaseline",
 		},
 	})
+
+	log = logging.LoggerForModule()
 )
 
 type serviceImpl struct {
@@ -53,17 +56,22 @@ func (s *serviceImpl) AuthFuncOverride(ctx context.Context, fullMethodName strin
 	return ctx, authorizer.Authorized(ctx, fullMethodName)
 }
 
+// GetNetworkBaselineStatusForFlows - gets the status of the flows within the baseline.
 func (s *serviceImpl) GetNetworkBaselineStatusForFlows(
 	ctx context.Context,
 	request *v1.NetworkBaselineStatusRequest,
 ) (*v1.NetworkBaselineStatusResponse, error) {
+	log.Infof("SHREWS -- GetNetworkBaselineStatusForFlows -- %s", request)
 	// Check if the baseline for deployment indeed exists
 	baseline, found, err := s.datastore.GetNetworkBaseline(ctx, request.GetDeploymentId())
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return nil, errox.NotFound.New("network baseline for the deployment does not exist")
+		baseline, err = s.createBaseline(ctx, request.GetDeploymentId())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Got the baseline, check status of each passed in peer
@@ -71,10 +79,12 @@ func (s *serviceImpl) GetNetworkBaselineStatusForFlows(
 	return &v1.NetworkBaselineStatusResponse{Statuses: statuses}, nil
 }
 
+// GetNetworkBaseline -- gets the network baseline assocated with the deployment.
 func (s *serviceImpl) GetNetworkBaseline(
 	ctx context.Context,
 	request *v1.ResourceByID,
 ) (*storage.NetworkBaseline, error) {
+	log.Infof("SHREWS -- GetNetworkBaseline -- %s", request)
 	if request.GetId() == "" {
 		return nil, errors.Wrap(errox.InvalidArgs, "Network baseline id must be provided")
 	}
@@ -83,20 +93,30 @@ func (s *serviceImpl) GetNetworkBaseline(
 		return nil, err
 	}
 	if !found {
-		// We didn't find one but user asked for one.  Let's try to build one
-		err = s.manager.CreateNetworkBaseline(request.GetId())
+		baseline, err = s.createBaseline(ctx, request.GetId())
 		if err != nil {
 			return nil, err
 		}
-		// TODO SHREWS:  probably should return the baseline from the call to CreateNetworkBaseline.  For now I will just
-		// try to retrieve it again.
-		baseline, found, err = s.datastore.GetNetworkBaseline(ctx, request.GetId())
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			return nil, errors.Wrapf(errox.NotFound, "network baseline with id %q does not exist", request.GetId())
-		}
+	}
+
+	return baseline, nil
+}
+
+func (s *serviceImpl) createBaseline(ctx context.Context, deploymentID string) (*storage.NetworkBaseline, error) {
+	log.Infof("SHREWS -- createBaseline -- notFound")
+	// We didn't find one but user asked for one.  Let's try to build one
+	err := s.manager.CreateNetworkBaseline(deploymentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Grab the newly created baseline
+	baseline, found, err := s.datastore.GetNetworkBaseline(ctx, deploymentID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, errors.Wrapf(errox.NotFound, "network baseline with id %q does not exist", deploymentID)
 	}
 
 	return baseline, nil
@@ -156,6 +176,7 @@ func (s *serviceImpl) getBaselinePeerByEntityID(
 }
 
 func (s *serviceImpl) ModifyBaselineStatusForPeers(ctx context.Context, request *v1.ModifyBaselineStatusForPeersRequest) (*v1.Empty, error) {
+	log.Infof("SHREWS -- ModifyBaselineStatusForPeers -- %s", request)
 	err := s.manager.ProcessBaselineStatusUpdate(ctx, request)
 	if err != nil {
 		return nil, err
@@ -164,6 +185,7 @@ func (s *serviceImpl) ModifyBaselineStatusForPeers(ctx context.Context, request 
 }
 
 func (s *serviceImpl) LockNetworkBaseline(ctx context.Context, request *v1.ResourceByID) (*v1.Empty, error) {
+	log.Infof("SHREWS -- LockNetworkBaseline -- %s", request)
 	err := s.manager.ProcessBaselineLockUpdate(ctx, request.Id, true)
 	if err != nil {
 		return nil, err
@@ -172,6 +194,7 @@ func (s *serviceImpl) LockNetworkBaseline(ctx context.Context, request *v1.Resou
 }
 
 func (s *serviceImpl) UnlockNetworkBaseline(ctx context.Context, request *v1.ResourceByID) (*v1.Empty, error) {
+	log.Infof("SHREWS -- UnlockNetworkBaseline -- %s", request)
 	err := s.manager.ProcessBaselineLockUpdate(ctx, request.Id, false)
 	if err != nil {
 		return nil, err

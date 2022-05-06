@@ -25,22 +25,25 @@ type DeploymentObservationQueue interface {
 	Peek() *DeploymentObservation
 	Push(observation *DeploymentObservation)
 	RemoveDeployment(deploymentID string)
+	RemoveDeploymentsForCluster(clusterID string)
 	RemoveFromObservation(deploymentID string)
 	GetObservationDetails(deploymentID string) *DeploymentObservation
 }
 
 // deploymentObservationQueue queue for deployments in observation window
 type deploymentObservationQueueImpl struct {
-	mutex         sync.Mutex
-	queue         *list.List
-	deploymentMap map[string]*list.Element
+	mutex                sync.Mutex
+	queue                *list.List
+	deploymentMap        map[string]*list.Element
+	deploymentClusterMap map[string]string
 }
 
 // New creates a new instance of the queue
 func New() DeploymentObservationQueue {
 	return &deploymentObservationQueueImpl{
-		queue:         list.New(),
-		deploymentMap: make(map[string]*list.Element),
+		queue:                list.New(),
+		deploymentMap:        make(map[string]*list.Element),
+		deploymentClusterMap: make(map[string]string),
 	}
 }
 
@@ -98,13 +101,15 @@ func (q *deploymentObservationQueueImpl) Push(observation *DeploymentObservation
 	// Reference the list object in the deployment map
 	q.deploymentMap[observation.DeploymentID] = depObj
 
+	// If caller is using cluster, add it to deployment Cluster map
+	if len(observation.ClusterID) > 0 {
+		q.deploymentClusterMap[observation.DeploymentID] = observation.ClusterID
+	}
+
 }
 
-// RemoveDeployment removes a deployment from the list and the map
-func (q *deploymentObservationQueueImpl) RemoveDeployment(deploymentID string) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
+// removeListItem removes the list item associated with a deployment
+func (q *deploymentObservationQueueImpl) removeListItem(deploymentID string) {
 	// The deployment is kept in the map after it has been processed to ensure we
 	// do not process it again.  In that case the depObj will be nil
 	depObj, found := q.deploymentMap[deploymentID]
@@ -116,7 +121,34 @@ func (q *deploymentObservationQueueImpl) RemoveDeployment(deploymentID string) {
 	if depObj != nil {
 		q.queue.Remove(depObj)
 	}
+}
+
+// RemoveDeployment removes a deployment from the list and the map
+func (q *deploymentObservationQueueImpl) RemoveDeployment(deploymentID string) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	// remove the corresponding list items
+	q.removeListItem(deploymentID)
+
 	delete(q.deploymentMap, deploymentID)
+	delete(q.deploymentClusterMap, deploymentID)
+}
+
+// RemoveDeploymentsForCluster removes all deployments associated with a cluster from the list and the map
+func (q *deploymentObservationQueueImpl) RemoveDeploymentsForCluster(clusterID string) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	for deploymentID, mappedClusterID := range q.deploymentClusterMap {
+		if clusterID == mappedClusterID {
+			// remove the corresponding list items
+			q.removeListItem(deploymentID)
+
+			delete(q.deploymentMap, deploymentID)
+			delete(q.deploymentClusterMap, deploymentID)
+		}
+	}
 }
 
 // RemoveFromObservation removes a deployment from observation

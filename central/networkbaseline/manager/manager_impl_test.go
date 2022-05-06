@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/types"
 	"github.com/golang/mock/gomock"
 	deploymentMocks "github.com/stackrox/rox/central/deployment/datastore/mocks"
 	"github.com/stackrox/rox/central/networkbaseline/datastore"
@@ -318,6 +319,13 @@ func (suite *ManagerTestSuite) TestFlowsUpdateForOtherEntityTypes() {
 }
 
 func (suite *ManagerTestSuite) TestFlowsUpdate() {
+	log.Info("SHREWS --------------------")
+	var ts *types.Timestamp
+	log.Info(ts)
+	var lastTime *time.Time
+	log.Info(lastTime)
+	var micro timestamp.MicroTS
+	log.Info(micro)
 	suite.mustInitManager()
 	suite.initBaselinesForDeployments(1, 2, 3)
 	suite.assertBaselinesAre(emptyBaseline(1), emptyBaseline(2), emptyBaseline(3))

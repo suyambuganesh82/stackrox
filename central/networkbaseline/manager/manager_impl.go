@@ -43,6 +43,8 @@ var (
 	networkBaselineSAC = sac.ForResource(resources.NetworkBaseline)
 
 	log = logging.LoggerForModule()
+
+	durationPeriod = env.NetworkBaselineObservationPeriod.DurationSetting()
 )
 
 type manager struct {
@@ -62,13 +64,11 @@ type manager struct {
 }
 
 func getNewObservationPeriodEnd() timestamp.MicroTS {
-	return timestamp.Now().Add(env.NetworkBaselineObservationPeriod.DurationSetting())
+	return timestamp.Now().Add(durationPeriod)
 }
 
-// TODO SHREWS:  So update when one of the deployments is in observation AND not user locked.  This method may be OK.
-// Will need to walk through it when done.
-// What do I do if one deployment has an unlocked user baseline and the other is still in observation with no baseline.
-func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS timestamp.MicroTS) bool {
+// shouldUpdate -- looks at the baselines and flows to determine if the flow should be added to the baseline.
+func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS timestamp.MicroTS, initialLoad bool) bool {
 	var atLeastOneBaselineInObservationPeriod bool
 	for _, entity := range []*networkgraph.Entity{&conn.SrcEntity, &conn.DstEntity} {
 		if _, valid := networkbaseline.ValidBaselinePeerEntityTypes[entity.Type]; !valid {
@@ -90,9 +90,42 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		if baselineInfo.UserLocked {
 			return false
 		}
-		if baselineInfo.ObservationPeriodEnd.After(updateTS) {
+		// If at least one baseline is in observation and neither baseline
+		// is user locked then we update based on the flows.  This includes if
+		// one of the baselines is "soft" locked due to the observation period
+		// having ended for that baseline.
+		//if baselineInfo.DeploymentName == "net-bl-client-baselined" || baselineInfo.DeploymentName == "net-bl-client-anomalous" || baselineInfo.DeploymentName == "net-bl-client-deferred-baselined" {
+		log.Infof("SHREWS -- shouldUpdate -- deployment %s", baselineInfo.DeploymentName)
+		log.Infof("SHREWS observation end %s", baselineInfo.ObservationPeriodEnd)
+		log.Infof("SHREWS -- updateTS -- %s", updateTS)
+		//}
+
+		// TODO SHREWS:  Figure out something better
+		// Deployment Observation expired OR user requested a baseline;
+		// so we shouldUpdate the deployments involved.
+		if initialLoad {
+			atLeastOneBaselineInObservationPeriod = true
+			continue
+		}
+
+		// It is possible that the last time stamp on the flow is nil if the connection is initial and still open
+		// In those cases updateTS will be 0 because that is the nil value of a MicroTS.  So all flows in such a state
+		// would think the baseline is out of observation or not when we compare the time as we do below.  To resolve
+		// these cases we compare to now if the timestamp is 0 to ensure we don't add a flow to a baseline that is
+		// no longer being observed.
+		compareTime := updateTS
+		if compareTime == 0 {
+			compareTime = timestamp.Now()
+		}
+
+		// If the last time the flow was seen is nil, then updateTS will be 0 and thus
+		// the baseline will always report being in observation.
+		// Additionally, we could be in an initial load state where Deployment Observation expired
+		// OR user requested a baseline; so we shouldUpdate the deployments involved.
+		if baselineInfo.ObservationPeriodEnd.After(compareTime) || initialLoad {
 			atLeastOneBaselineInObservationPeriod = true
 		}
+		log.Infof("SHREWS -- %t", atLeastOneBaselineInObservationPeriod)
 	}
 	return atLeastOneBaselineInObservationPeriod
 }
@@ -205,11 +238,11 @@ func (m *manager) lookUpPeerName(entity networkgraph.Entity) string {
 	}
 }
 
-func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
+func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, initialLoad bool) error {
 	//log.Info("SHREWS -- processFlowUpdate")
 	modifiedDeploymentIDs := set.NewStringSet()
 	for conn, updateTS := range flows {
-		if !m.shouldUpdate(&conn, updateTS) {
+		if !m.shouldUpdate(&conn, updateTS, initialLoad) {
 			continue
 		}
 		if conn.SrcEntity.Type == storage.NetworkEntityInfo_DEPLOYMENT {
@@ -242,9 +275,6 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
 	//log.Info("SHREWS -- processDeploymentCreate")
-	// TODO SHREWS:  figure out best approach with that cluster delete issue.  I think my life is simpler if I only
-	// populate this map when I'm creating a baseline.  Though I could probably use some combination
-	// of this map vs in observation to work around that issue so the cluster delete part would be unchanged.
 
 	if _, exists := m.baselinesByDeploymentID[deploymentID]; exists {
 		return nil
@@ -260,6 +290,11 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 			InObservation:  true,
 			ObservationEnd: getNewObservationPeriodEnd().GogoProtobuf(),
 		})
+
+	if deploymentName == "net-bl-client-baselined" || deploymentName == "net-bl-client-anomalous" || deploymentName == "net-bl-client-deferred-baselined" {
+		log.Infof("SHREWS deployment %s", deploymentName)
+		log.Infof("SHREWS observation end %s", getNewObservationPeriodEnd().GogoProtobuf())
+	}
 
 	return nil
 }
@@ -333,7 +368,7 @@ func (m *manager) ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 	//log.Info("SHREWS -- ProcessFlowUpdate")
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.processFlowUpdate(flows)
+	return m.processFlowUpdate(flows, false)
 }
 
 func (m *manager) validatePeers(peers []*v1.NetworkBaselinePeerStatus) error {
@@ -466,6 +501,7 @@ func (m *manager) processNetworkPolicyUpdate(
 			// take care of setting the observation period
 			continue
 		}
+		log.Infof("SHREWS -- processNetworkPolicyUpdate is causing updates to observation %s", deploymentID)
 		baseline.ObservationPeriodEnd = getNewObservationPeriodEnd()
 		modifiedDeploymentIDs.Add(deploymentID)
 	}
@@ -569,11 +605,6 @@ func (m *manager) ProcessBaselineLockUpdate(ctx context.Context, deploymentID st
 }
 
 func (m *manager) processPostClusterDelete(clusterID string) error {
-	// TODO SHREWS:  Figure out what to do here.  will need to figure out how to remove deployments from those
-	// clusters out of the observation queue.  If this happens after the baseline is complete, simple enough to
-	// use the deletingBaselines to remove from the observation queue.  Otherwise I need to figure out which deployments
-	// match to that cluster so I can remove the ones in observation from the queue.  Or does it matter?  When the ticker
-	// ticks I shouldn't find any flows for those deployments.  But that wouldn't be clean.
 	deletingBaselines := set.NewStringSet()
 	for deploymentID, baseline := range m.baselinesByDeploymentID {
 		if baseline.ClusterID == clusterID {
@@ -616,11 +647,12 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 	}
 	// Delete from cache
 	for deploymentID := range deletingBaselines {
-		// Remove the deployment from the observation queue
-		m.deploymentObservationQueue.RemoveDeployment(deploymentID)
-
 		delete(m.baselinesByDeploymentID, deploymentID)
 	}
+
+	// Remove all deployments for this cluster from the observation queue
+	m.deploymentObservationQueue.RemoveDeploymentsForCluster(clusterID)
+
 	return nil
 }
 
@@ -638,6 +670,9 @@ func (m *manager) initFromStore() error {
 		if err != nil {
 			return err
 		}
+		// TODO SHREWS:  For completeness should I add an item to the observation queue for this
+		// deployment to ensure it is there for checks.  Would need to be an empty object.  Furthermore, we should
+		// probably get the deployments and add them to the ObservationQueue
 		m.baselinesByDeploymentID[baseline.GetDeploymentId()] = baselineInfo
 
 		// Try loading all the network policies to build the seen network policies cache
@@ -673,14 +708,19 @@ func (m *manager) flushBaselineQueue() {
 		}
 
 		// Grab the first deployment to baseline.
+		// NOTE:  This is the only place from which Pull is being called.
 		deployment := m.deploymentObservationQueue.Pull()
 
-		m.addBaseline(deployment.DeploymentID, deployment.DeploymentName, deployment.ClusterID, deployment.Namespace, timestamp.FromProtobuf(deployment.ObservationEnd))
+		if deployment.DeploymentName == "net-bl-client-baselined" || deployment.DeploymentName == "net-bl-client-anomalous" || deployment.DeploymentName == "net-bl-client-deferred-baselined" {
+			log.Infof("SHREWS -- flush -- deployment %s", deployment.DeploymentName)
+			log.Infof("SHREWS observation end %s", timestamp.FromProtobuf(deployment.ObservationEnd))
+		}
+
+		_ = m.addBaseline(deployment.DeploymentID, deployment.DeploymentName, deployment.ClusterID, deployment.Namespace, timestamp.FromProtobuf(deployment.ObservationEnd))
 	}
 }
 
 func (m *manager) flushBaselineQueuePeriodically() {
-	//log.Info("SHREWS -- flushBaselineQueuePeriodically")
 	defer m.baselineFlushTicker.Stop()
 	for range m.baselineFlushTicker.C {
 		m.flushBaselineQueue()
@@ -690,15 +730,15 @@ func (m *manager) flushBaselineQueuePeriodically() {
 func (m *manager) getFlowStore(ctx context.Context, clusterID string) (networkFlowDS.FlowDataStore, error) {
 	flowStore, err := m.clusterFlows.GetFlowStore(ctx, clusterID)
 	if err != nil {
-		return nil, errors.Errorf("could not obtain flows for cluster %s: %v", clusterID, err)
+		return nil, errors.Errorf("could not obtain flow store for cluster %s: %v", clusterID, err)
 	}
 	if flowStore == nil {
-		return nil, errors.Wrapf(errox.NotFound, "no flows found for cluster %s", clusterID)
+		return nil, errors.Wrapf(errox.NotFound, "no flow store found for cluster %s", clusterID)
 	}
 	return flowStore, nil
 }
 
-func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace string, observationEnd timestamp.MicroTS) {
+func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace string, observationEnd timestamp.MicroTS) error {
 	log.Infof("SHREWS -- addBaseline - %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -707,7 +747,7 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 	// We have already created a baseline for this deployment.  Nothing necessary to do.
 	if _, found := m.baselinesByDeploymentID[deploymentID]; found {
-		return
+		return nil
 	}
 
 	// Create an empty baseline entry in the map.  This will put this deployment in a state where it will be updated until
@@ -725,28 +765,30 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	// Grab flows related to deployment
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
 	if err != nil {
-		// TODO SHREWS:  Should probably log or do something here.
-		log.Error(err)
-		return
+		return err
 	}
 
 	// If we have flows then process them.  If we don't persist an empty baseline
 	if len(flows) > 0 {
+		log.Info("SHREWS -- we got some flows -- %s", deploymentName)
 		// package them into a map of flows like comes in
 		// when packaging the flows up in that map, I think the timestamp has to be now
-		flowMap := putFlowsInMap(flows)
+		flowMap := m.putFlowsInMap(flows)
 
 		// then simply call processFlowUpdate with the map of flows.
-		err = m.processFlowUpdate(flowMap)
-
-		// TODO SHREWS:  figure out if I want to do anything with error
+		err = m.processFlowUpdate(flowMap, true)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
 	} else {
-		m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
+		log.Infof("SHREWS -- NO FLOWS -- %s", deploymentName)
+		err = m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
+		if err != nil {
+			return err
+		}
 	}
 
+	return nil
 }
 
 func (m *manager) CreateNetworkBaseline(deploymentID string) error {
@@ -755,9 +797,10 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 		return errors.Wrapf(errox.NotFound, "deployment with id %q does not exist", deploymentID)
 	}
 	if err != nil {
-		return nil
+		return err
 	}
 
+	// Need the details from the Observation Queue to grab the proper Observation Time
 	depDetails := m.deploymentObservationQueue.GetObservationDetails(deploymentID)
 	var t timestamp.MicroTS
 	if depDetails == nil {
@@ -765,12 +808,12 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 	} else {
 		t = timestamp.FromProtobuf(depDetails.ObservationEnd)
 	}
-	// TODO SHREWS:  Think about this time.  Probably going to need to add an method or 2 to the queue.  One to get
-	// an object and one to remove it from observation.
 
 	// Now build the baseline
-	// TODO SHREWS:  return an error from this guy and use that info to determine if we should remove from observation
-	m.addBaseline(deployment.GetId(), deployment.GetName(), deployment.GetClusterId(), deployment.GetNamespace(), t)
+	err = m.addBaseline(deployment.GetId(), deployment.GetName(), deployment.GetClusterId(), deployment.GetNamespace(), t)
+	if err != nil {
+		return err
+	}
 
 	// Remove from the observation queue because we are creating a baseline for this deployment
 	m.deploymentObservationQueue.RemoveFromObservation(deploymentID)
@@ -778,15 +821,18 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 	return nil
 }
 
-func putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgraph.NetworkConnIndicator]timestamp.MicroTS {
+func (m *manager) putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgraph.NetworkConnIndicator]timestamp.MicroTS {
+	log.Infof("SHREWS -- putFlowsInMap -- %s", newFlows)
 	out := make(map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, len(newFlows))
 	now := timestamp.Now()
 	for _, newFlow := range newFlows {
-		t := timestamp.FromProtobuf(newFlow.LastSeenTimestamp)
-		if newFlow.LastSeenTimestamp != nil {
-			t = now
-		}
-		out[networkgraph.GetNetworkConnIndicator(newFlow)] = t
+		log.Infof("SHREWS -- putFlowsInMap -- time -- %s", newFlow.LastSeenTimestamp)
+		//t := timestamp.FromProtobuf(newFlow.LastSeenTimestamp)
+		//if newFlow.LastSeenTimestamp == nil {
+		//	t = now
+		//}
+
+		out[networkgraph.GetNetworkConnIndicator(newFlow)] = now
 	}
 	return out
 }

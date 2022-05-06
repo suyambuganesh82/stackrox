@@ -78,7 +78,6 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 		return srcMatch || dstMatch
 	}
 
-	// TODO SHREWS: Need to figure out what to do with since.
 	flows, _, err := s.readFlows(pred, nil)
 
 	return flows, err

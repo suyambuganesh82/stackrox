@@ -152,7 +152,7 @@ class BaseSpecification extends Specification {
 
     @Rule
     Timeout globalTimeout = new Timeout(
-            isRaceBuild() ? 2500 : 800,
+            isRaceBuild() ? 2500 : 1800,
             TimeUnit.SECONDS
     )
     @Rule

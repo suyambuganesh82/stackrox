@@ -9,6 +9,7 @@ import util.NetworkGraphUtil
 import org.junit.experimental.categories.Category
 import spock.lang.Ignore
 import spock.lang.Retry
+import util.Timer
 
 @Retry(count = 0)
 class NetworkBaselineTest extends BaseSpecification {
@@ -16,6 +17,7 @@ class NetworkBaselineTest extends BaseSpecification {
     static final private String BASELINED_CLIENT_DEP_NAME = "net-bl-client-baselined"
     static final private String ANOMALOUS_CLIENT_DEP_NAME = "net-bl-client-anomalous"
     static final private String DEFERRED_BASELINED_CLIENT_DEP_NAME = "net-bl-client-deferred-baselined"
+    static final private String DEFERRED_POST_LOCK_DEP_NAME = "net-bl-client-post-lock"
 
     static final private String NGINX_IMAGE = "quay.io/rhacs-eng/qa:nginx-1.19-alpine"
 
@@ -55,6 +57,15 @@ class NetworkBaselineTest extends BaseSpecification {
         .setName(DEFERRED_BASELINED_CLIENT_DEP_NAME)
         .setImage(NGINX_IMAGE)
         .addLabel("app", DEFERRED_BASELINED_CLIENT_DEP_NAME)
+        .setCommand(["/bin/sh", "-c",])
+        .setArgs(["while sleep 1; " +
+                      "do wget -S http://${SERVER_DEP_NAME}; " +
+                      "done" as String,])
+
+    static final private DEFERRED_POST_LOCK_CLIENT_DEP = createAndRegisterDeployment()
+        .setName(DEFERRED_POST_LOCK_DEP_NAME)
+        .setImage(NGINX_IMAGE)
+        .addLabel("app", DEFERRED_POST_LOCK_DEP_NAME)
         .setCommand(["/bin/sh", "-c",])
         .setArgs(["while sleep 1; " +
                       "do wget -S http://${SERVER_DEP_NAME}; " +
@@ -105,7 +116,6 @@ class NetworkBaselineTest extends BaseSpecification {
     }
 
     @Category(NetworkBaseline)
-//     @Ignore("Skip test for now, we're working on fixing it.")
     def "Verify network baseline functionality"() {
         when:
         "Create initial set of deployments, wait for baseline to populate"
@@ -145,6 +155,7 @@ class NetworkBaselineTest extends BaseSpecification {
         assert serverBaseline
         def anomalousClientBaseline = NetworkBaselineService.getNetworkBaseline(anomalousClientDeploymentID)
         assert anomalousClientBaseline
+        println "Anomalous Baseline: ${anomalousClientBaseline}"
         def baselinedClientBaseline = NetworkBaselineService.getNetworkBaseline(baselinedClientDeploymentID)
         assert baselinedClientDeploymentID
 
@@ -167,8 +178,13 @@ class NetworkBaselineTest extends BaseSpecification {
 
         def deferredBaselinedClientDeploymentID = DEFERRED_BASELINED_CLIENT_DEP.deploymentUid
         assert deferredBaselinedClientDeploymentID != null
+        println "Deferred Baseline: ${deferredBaselinedClientDeploymentID}"
+        // Need to chill out until the observation period ends
 
-        assert NetworkGraphUtil.checkForEdge(anomalousClientDeploymentID, serverDeploymentID, null, 180)
+        sleep 180000
+        println "Back from a nap"
+
+        assert NetworkGraphUtil.checkForEdge(deferredBaselinedClientDeploymentID, serverDeploymentID, null, 180)
         serverBaseline = evaluateWithRetry(20, 3) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             if (baseline.getPeersCount() < 2) {
@@ -198,5 +214,60 @@ class NetworkBaselineTest extends BaseSpecification {
         )
         validateBaseline(deferredBaselinedClientBaseline, beforeDeferredCreate, justAfterDeferredCreate,
             [new Tuple2<String, Boolean>(serverDeploymentID, false)])
+
+        when:
+        "Create another deployment, ensure it DOES NOT get added to serverDeploymentID due to user lock"
+        NetworkBaselineService.lockNetworkBaseline(serverDeploymentID)
+
+        def beforePostLockCreate = System.currentTimeSeconds()
+        batchCreate([DEFERRED_POST_LOCK_CLIENT_DEP])
+        def justAfterPostLockCreate = System.currentTimeSeconds()
+
+        def postLockClientDeploymentID = DEFERRED_POST_LOCK_CLIENT_DEP.deploymentUid
+        assert postLockClientDeploymentID != null
+        println "Post Lock Deployment: ${postLockClientDeploymentID}"
+        // Need to chill out until the observation period ends
+
+        sleep 210000
+        println "Back from a nap"
+
+        assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)
+        serverBaseline = evaluateWithRetry(20, 3) {
+            def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
+            if (baseline.getPeersCount() > 2) {
+                throw new RuntimeException(
+                    "Too many peers for ${serverDeploymentID} due to lock. Baseline is ${baseline}"
+                )
+            }
+            return baseline
+        }
+        assert serverBaseline
+
+        print "About to do a get"
+        def postLockClientBaseline = NetworkBaselineService.getNetworkBaseline(
+            postLockClientDeploymentID
+        )
+        print "back from get, hopefully we didn't delete crap already"
+        assert postLockClientBaseline
+        print postLockClientBaseline
+
+        then:
+        "Validate the locked baselines"
+        validateBaseline(serverBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
+            [new Tuple2<String, Boolean>(baselinedClientDeploymentID, true),
+             // Baseline was locked, so post lock client should not be added.
+             new Tuple2<String, Boolean>(postLockClientDeploymentID, false),
+            ]
+        )
+        validateBaseline(deferredBaselinedClientBaseline, beforeDeferredCreate, justAfterDeferredCreate,
+            [new Tuple2<String, Boolean>(serverDeploymentID, false)])
     }
+
+//     @Category(NetworkBaseline)
+//     def "Verify user lock"() {
+//     }
+//
+//     @Category(NetworkBaseline)
+//     def "Verify user get for non-existent baseline"() {
+//     }
 }
