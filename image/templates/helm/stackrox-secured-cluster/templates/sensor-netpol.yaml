@@ -22,7 +22,7 @@ spec:
       - podSelector:
           matchLabels:
             app: admission-control
-{{ if and ._rox.env.openshift (eq ._rox.scanner.mode "slim") }}
+{{ if ._rox.sensor.localImageScanning.enabled }}
       - podSelector:
           matchLabels:
             app: scanner
