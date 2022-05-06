@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -658,8 +657,9 @@ func customRoutes() (customRoutes []routes.CustomRoute) {
 	// worth of compression in definition's bundle. Ignore all other types (e.g.,
 	// `.zip` for the bundle itself).
 	definitionsFileGzipHandler, err := gziphandler.GzipHandlerWithOpts(gziphandler.ContentTypes([]string{
-		mime.TypeByExtension(".json"),
-		mime.TypeByExtension(".yaml"),
+		"application/json",
+		"application/yaml",
+		"text/plain",
 	}))
 	utils.CrashOnError(err)
 	customRoutes = append(customRoutes,
