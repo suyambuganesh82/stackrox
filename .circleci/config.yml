@@ -3,6 +3,13 @@ runOnAllTags: &runOnAllTags
     tags:
       only: /.*/
 
+runOnTagsOnly: &runOnTagsOnly
+  filters:
+    tags:
+      only: /.*/
+    branches:
+      ignore: /.*/
+
 # This runs a command only on rc builds,
 # which is a tagged build with a tag matching the below regex.
 runOnlyOnReleaseCandidateBuilds: &runOnlyOnReleaseCandidateBuilds
@@ -18,15 +25,6 @@ runOnlyOnReleaseBuilds: &runOnlyOnReleaseBuilds
   filters:
     tags:
       only: /^\d+(\.\d+)?\.\d+\.\d+$/
-    branches:
-      ignore: /.*/
-
-# This runs a command only on rc and release builds,
-# which is a tagged build with a tag matching the below regex.
-runOnlyOnReleaseAndReleaseCandidateBuilds: &runOnlyOnReleaseAndReleaseCandidateBuilds
-  filters:
-    tags:
-      only: /^\d+(\.\d+)?\.\d+\.\d+(-rc\.\d+)?$/
     branches:
       ignore: /.*/
 
@@ -628,6 +626,25 @@ commands:
 
           echo "Not running tests"
           circleci step halt
+
+  gate-job:
+    description: Decide whether to run a job
+    parameters:
+      job:
+        type: string
+    steps:
+      - run:
+          name: Decide whether to run << parameters.job >>
+          command: |
+            source scripts/ci/lib.sh
+            # gate_job() exits with 0 when a job should *not* be run in keeping
+            # with OpenShift CI semantics.
+            exitstatus=0
+            (gate_job '<< parameters.job >>'; exit 1) || exitstatus="$?"
+            if [[ "$exitstatus" == "0" ]]; then
+              echo "Not running tests"
+              circleci step halt
+            fi
 
   get-and-store-debug-dump:
     description: Runs roxctl debug dump and stores it for the job.
@@ -3016,15 +3033,8 @@ jobs:
     resource_class: small
     steps:
       - checkout
-      - check-backend-changes
-      - check-to-run:
-          label: ci-upgrade-tests
-          run-on-master: true
-          run-on-tags: true
-          changed-path: '^migrator/.*$|^image/'
-      - check-label-to-skip-tests:
-          label: ci-no-upgrade-tests
-
+      - gate-job:
+          job: gke-upgrade-tests
       - provision-gke-cluster:
           cluster-id: upgrade-test
 
@@ -3706,14 +3716,8 @@ jobs:
       LOAD_BALANCER: "lb"
     steps:
       - checkout
-      - check-backend-changes
-      - check-to-run:
-          label: ci-upgrade-tests
-          run-on-master: true
-          run-on-tags: true
-          changed-path: '^migrator/.*$|^image/'
-      - check-label-to-skip-tests:
-          label: ci-no-upgrade-tests
+      - gate-job:
+          job: gke-upgrade-tests
       - attach_workspace:
           at: /go/src/github.com/stackrox/rox
       - restore-go-mod-cache
@@ -4802,11 +4806,7 @@ workflows:
       not: << pipeline.parameters.trigger_on_demand >>
     jobs: &buildAllJobs
       - slack-notify:
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              ignore: /.*/
+          <<: *runOnTagsOnly
           context: custom-executor-pull
       - style-checks:
           <<: *runOnAllTagsWithQuayIOPullCtx
@@ -5120,8 +5120,8 @@ workflows:
             - go-unit-tests
             - ui-unit-tests
 
-      - scan-images-in-quay: #TODO(ROX-10676): Enable scan on every change.
-          <<: *runOnlyOnReleaseAndReleaseCandidateBuilds
+      - scan-images-in-quay:
+          <<: *runOnTagsOnly
           context:
           - quay-rhacs-eng-readonly
           requires:
@@ -5129,12 +5129,8 @@ workflows:
             - build-rhacs
 
       - retrigger-master-workflow:
+          <<: *runOnTagsOnly
           context: custom-executor-pull
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /.*/
 
   nightly:
     triggers:
