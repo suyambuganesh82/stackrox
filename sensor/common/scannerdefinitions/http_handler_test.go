@@ -51,16 +51,16 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 	}{
 		{
 			name:         "when central replies 200 with content then writer matches",
-			statusCode:   200,
+			statusCode:   http.StatusOK,
 			responseBody: "the foobar body.",
 		},
 		{
 			name:       "when central replies 304 then writer matches",
-			statusCode: 304,
+			statusCode: http.StatusNotModified,
 		},
 		{
 			name:       "when method is not GET then 405",
-			statusCode: 405,
+			statusCode: http.StatusMethodNotAllowed,
 			args: args{
 				methods: []string{
 					http.MethodHead,
