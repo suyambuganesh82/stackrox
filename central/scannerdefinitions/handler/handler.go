@@ -142,6 +142,7 @@ func (h *httpHandler) get(w http.ResponseWriter, r *http.Request) {
 	if fileName != "" {
 		f, err = openFromArchive(f.Name(), fileName)
 		if err != nil {
+			_ = f.Close()
 			writeErrorForFile(w, err, fileName)
 			return
 		}
