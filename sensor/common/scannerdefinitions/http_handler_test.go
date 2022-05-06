@@ -38,14 +38,10 @@ func (f transportMockFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
-	testRequest := http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{RawQuery: "bar=1&foo=2"},
-		Header: map[string][]string{"If-Modified-Since": {"1209"}, "Accept-Encoding": {""}},
-	}
 	type args struct {
 		writer  *responseWriterMock
 		request *http.Request
+		methods []string
 	}
 	tests := []struct {
 		name         string
@@ -57,41 +53,68 @@ func Test_scannerDefinitionsHandler_ServeHTTP(t *testing.T) {
 			name:         "when central replies 200 with content then writer matches",
 			statusCode:   200,
 			responseBody: "the foobar body.",
-			args: args{
-				writer: NewMockResponseWriter(),
-			},
 		},
 		{
-			name:         "when central replies 304 then writer matches",
-			statusCode:   304,
-			responseBody: "",
+			name:       "when central replies 304 then writer matches",
+			statusCode: 304,
+		},
+		{
+			name:       "when method is not GET then 405",
+			statusCode: 405,
 			args: args{
-				writer: NewMockResponseWriter(),
+				methods: []string{
+					http.MethodHead,
+					http.MethodPost,
+					http.MethodPut,
+					http.MethodPatch,
+					http.MethodDelete,
+					http.MethodConnect,
+					http.MethodOptions,
+					http.MethodTrace,
+				},
+				request: &http.Request{},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.args.request == nil {
-				tt.args.request = &testRequest
+			// Set args defaults.
+			if tt.args.writer == nil {
+				tt.args.writer = NewMockResponseWriter()
 			}
-			h := &scannerDefinitionsHandler{
-				centralClient: &http.Client{
-					Transport: transportMockFunc(func(req *http.Request) (*http.Response, error) {
-						assert.Equal(t, tt.args.request.URL.RawQuery, req.URL.RawQuery)
-						for _, header := range headersToProxy.AsSlice() {
-							assert.Equal(t, tt.args.request.Header[header], req.Header[header])
-						}
-						return &http.Response{
-							StatusCode: tt.statusCode,
-							Body:       io.NopCloser(bytes.NewBufferString(tt.responseBody)),
-						}, nil
-					}),
-				},
+			if tt.args.methods == nil {
+				// Defaults to GET.
+				tt.args.methods = []string{http.MethodGet}
 			}
-			h.ServeHTTP(tt.args.writer, tt.args.request)
-			assert.Equal(t, tt.responseBody, tt.args.writer.String())
-			assert.Equal(t, tt.statusCode, tt.args.writer.statusCode)
+			// Perform one test per HTTP method.
+			for _, method := range tt.args.methods {
+				if tt.args.request == nil {
+					tt.args.request = &http.Request{
+						Method: method,
+						URL:    &url.URL{RawQuery: "bar=1&foo=2"},
+						Header: map[string][]string{"If-Modified-Since": {"1209"}, "Accept-Encoding": {""}},
+					}
+				} else {
+					tt.args.request.Method = method
+				}
+				h := &scannerDefinitionsHandler{
+					centralClient: &http.Client{
+						Transport: transportMockFunc(func(req *http.Request) (*http.Response, error) {
+							assert.Equal(t, tt.args.request.URL.RawQuery, req.URL.RawQuery)
+							for _, header := range headersToProxy.AsSlice() {
+								assert.Equal(t, tt.args.request.Header[header], req.Header[header])
+							}
+							return &http.Response{
+								StatusCode: tt.statusCode,
+								Body:       io.NopCloser(bytes.NewBufferString(tt.responseBody)),
+							}, nil
+						}),
+					},
+				}
+				h.ServeHTTP(tt.args.writer, tt.args.request)
+				assert.Equal(t, tt.responseBody, tt.args.writer.String())
+				assert.Equal(t, tt.statusCode, tt.args.writer.statusCode)
+			}
 		})
 	}
 }
