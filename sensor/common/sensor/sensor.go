@@ -232,6 +232,7 @@ func newScannerDefinitionsRoute(centralEndpoint string) (*routes.CustomRoute, er
 	if err != nil {
 		return nil, err
 	}
+	// We rely on central to handle content encoding negotiation.
 	return &routes.CustomRoute{
 		Route:         "/scanner/definitions",
 		Authorizer:    idcheck.ScannerOnly(),
