@@ -70,7 +70,7 @@ func (h *scannerDefinitionsHandler) ServeHTTP(writer http.ResponseWriter, reques
 	defer utils.IgnoreError(resp.Body.Close)
 	for k, vs := range resp.Header {
 		for _, v := range vs {
-			writer.Header().Set(k, v)
+			writer.Header().Add(k, v)
 		}
 	}
 	writer.WriteHeader(resp.StatusCode)
