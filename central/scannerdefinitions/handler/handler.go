@@ -373,7 +373,7 @@ func openFromArchive(archiveFile string, fileName string) (*os.File, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "creating temporary directory")
 	}
-	tmpFile, err := os.Create(path.Join(tmpDir, path.Base(fileName)))
+	tmpFile, err := os.Create(filepath.Join(tmpDir, path.Base(fileName)))
 	if err != nil {
 		// Best effort to clean.
 		_ = os.RemoveAll(tmpDir)
