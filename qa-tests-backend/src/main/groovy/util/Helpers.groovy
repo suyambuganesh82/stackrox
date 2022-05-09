@@ -74,21 +74,17 @@ class Helpers {
     static void collectDebugForFailure(Throwable exception) {
         if (!Env.IN_CI) {
             log.info "Won't collect logs when not in CI"
-//             return
+            return
         }
 
         if (exception && (exception instanceof AssumptionViolatedException ||
                 exception.getMessage().contains("org.junit.AssumptionViolatedException"))) {
             log.info("Won't collect logs for: ${exception.getMessage()}", exception)
-//             return
+            return
         }
 
         if (exception) {
             log.error("An exception occurred in test: ${exception.getMessage()}", exception)
-        }
-
-        if (!Env.IN_CI) {
-            return
         }
 
         try {

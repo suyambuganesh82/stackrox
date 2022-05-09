@@ -11,7 +11,6 @@ import (
 	"github.com/stackrox/rox/generated/storage"
 	"github.com/stackrox/rox/pkg/fixtures"
 	"github.com/stackrox/rox/pkg/grpc/testutils"
-	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/testutils/envisolator"
 	"github.com/stretchr/testify/suite"
@@ -19,8 +18,6 @@ import (
 
 var (
 	allAllowedCtx = sac.WithAllAccess(context.Background())
-
-	log = logging.LoggerForModule()
 )
 
 func TestNetworkBaselineService(t *testing.T) {

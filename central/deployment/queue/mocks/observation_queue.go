@@ -114,6 +114,18 @@ func (mr *MockDeploymentObservationQueueMockRecorder) RemoveDeployment(deploymen
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDeployment", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).RemoveDeployment), deploymentID)
 }
 
+// RemoveDeploymentsForCluster mocks base method.
+func (m *MockDeploymentObservationQueue) RemoveDeploymentsForCluster(clusterID string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemoveDeploymentsForCluster", clusterID)
+}
+
+// RemoveDeploymentsForCluster indicates an expected call of RemoveDeploymentsForCluster.
+func (mr *MockDeploymentObservationQueueMockRecorder) RemoveDeploymentsForCluster(clusterID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDeploymentsForCluster", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).RemoveDeploymentsForCluster), clusterID)
+}
+
 // RemoveFromObservation mocks base method.
 func (m *MockDeploymentObservationQueue) RemoveFromObservation(deploymentID string) {
 	m.ctrl.T.Helper()

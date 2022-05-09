@@ -198,7 +198,7 @@ func (suite *ManagerTestSuite) processFlowUpdate(inObsPeriodFlows []networkgraph
 }
 
 func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkBaseline) {
-	//log.Infof("SHREWS -- assertBaselinesAre 1 %s", baselines)
+	// log.Infof("SHREWS -- assertBaselinesAre 1 %s", baselines)
 	baselinesWithoutObsPeriod := make([]*storage.NetworkBaseline, 0, len(suite.ds.baselines))
 	obsPeriodStart := suite.currTestStart.Add(env.NetworkBaselineObservationPeriod.DurationSetting())
 	// Assume that the test takes no longer than one minute.
@@ -211,7 +211,7 @@ func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkB
 		cloned.ObservationPeriodEnd = nil
 		baselinesWithoutObsPeriod = append(baselinesWithoutObsPeriod, cloned)
 	}
-	//log.Infof("SHREWS -- assertBaselinesAre 3 %s", baselinesWithoutObsPeriod)
+	// log.Infof("SHREWS -- assertBaselinesAre 3 %s", baselinesWithoutObsPeriod)
 	suite.ElementsMatch(baselinesWithoutObsPeriod, baselines)
 }
 

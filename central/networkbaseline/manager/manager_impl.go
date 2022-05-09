@@ -95,7 +95,7 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		// is user locked then we update based on the flows.  This includes if
 		// one of the baselines is "soft" locked due to the observation period
 		// having ended for that baseline.
-		//if baselineInfo.DeploymentName == "net-bl-client-baselined" || baselineInfo.DeploymentName == "net-bl-client-anomalous" || baselineInfo.DeploymentName == "net-bl-client-deferred-baselined" {
+		// if baselineInfo.DeploymentName == "net-bl-client-baselined" || baselineInfo.DeploymentName == "net-bl-client-anomalous" || baselineInfo.DeploymentName == "net-bl-client-deferred-baselined" {
 		log.Infof("SHREWS -- shouldUpdate -- deployment %s", baselineInfo.DeploymentName)
 		log.Infof("SHREWS observation end %s", baselineInfo.ObservationPeriodEnd)
 		log.Infof("SHREWS -- updateTS -- %s", updateTS)
@@ -231,8 +231,8 @@ func (m *manager) lookUpPeerName(entity networkgraph.Entity) string {
 	}
 }
 
-func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, initialLoad bool) error {
-	//log.Info("SHREWS -- processFlowUpdate")
+func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, initialLoad bool) (set.StringSet, error) {
+	// log.Info("SHREWS -- processFlowUpdate")
 	modifiedDeploymentIDs := set.NewStringSet()
 	for conn, updateTS := range flows {
 		if !m.shouldUpdate(&conn, updateTS, initialLoad) {
@@ -264,11 +264,16 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 		}
 	}
 	log.Infof("SHREWS -- modifiedDeploymentIDs %s", modifiedDeploymentIDs)
-	return m.persistNetworkBaselines(modifiedDeploymentIDs, nil)
+
+	err := m.persistNetworkBaselines(modifiedDeploymentIDs, nil)
+	if err != nil {
+		return nil, err
+	}
+	return modifiedDeploymentIDs, nil
 }
 
 func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
-	//log.Info("SHREWS -- processDeploymentCreate")
+	// log.Info("SHREWS -- processDeploymentCreate")
 
 	if _, exists := m.baselinesByDeploymentID[deploymentID]; exists {
 		return nil
@@ -294,7 +299,7 @@ func (m *manager) processDeploymentCreate(deploymentID, deploymentName, clusterI
 }
 
 func (m *manager) ProcessDeploymentCreate(deploymentID, deploymentName, clusterID, namespace string) error {
-	//log.Infof("SHREWS -- ProcessDeploymentCreate -- %s %s", deploymentID, deploymentName)
+	// log.Infof("SHREWS -- ProcessDeploymentCreate -- %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -359,10 +364,12 @@ func (m *manager) ProcessDeploymentDelete(deploymentID string) error {
 }
 
 func (m *manager) ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error {
-	//log.Info("SHREWS -- ProcessFlowUpdate")
+	// log.Info("SHREWS -- ProcessFlowUpdate")
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.processFlowUpdate(flows, false)
+
+	_, err := m.processFlowUpdate(flows, false)
+	return err
 }
 
 func (m *manager) validatePeers(peers []*v1.NetworkBaselinePeerStatus) error {
@@ -737,6 +744,8 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	writeEmpty := true
+
 	flowStore, _ := m.getFlowStore(managerCtx, clusterID)
 
 	// We have already created a baseline for this deployment.  Nothing necessary to do.
@@ -756,12 +765,6 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 		ForbiddenPeers:       make(map[networkbaseline.Peer]struct{}),
 	}
 
-	// Save the empty baseline because we may not be able to update it if all its connections are locked.
-	err := m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
-	if err != nil {
-		return err
-	}
-
 	// Grab flows related to deployment
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
 	if err != nil {
@@ -776,7 +779,22 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 		flowMap := m.putFlowsInMap(flows)
 
 		// then simply call processFlowUpdate with the map of flows.
-		err = m.processFlowUpdate(flowMap, true)
+		modifiedDeployments, err := m.processFlowUpdate(flowMap, true)
+		if err != nil {
+			return err
+		}
+		// if the modified list contains our deployment it was persisted with flows
+		if modifiedDeployments.Contains(deploymentID) {
+			log.Info("SHREWS -- No need to write empty")
+			writeEmpty = false
+		}
+	}
+
+	// If there are now flows OR the peers were all locked, we need to write an empty baseline.
+	if writeEmpty {
+		log.Info("SHREWS -- writing empty")
+		// Save the empty baseline because we may not be able to update it if all its connections are locked.
+		err := m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
 		if err != nil {
 			return err
 		}
@@ -809,7 +827,7 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 		return err
 	}
 
-	// Remove from the observation queue because we are creating a baseline for this deployment
+	// Remove from the observation queue because we are creating a baseline for this deployment per request
 	m.deploymentObservationQueue.RemoveFromObservation(deploymentID)
 
 	return nil
@@ -821,7 +839,7 @@ func (m *manager) putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgrap
 	now := timestamp.Now()
 	for _, newFlow := range newFlows {
 		log.Infof("SHREWS -- putFlowsInMap -- time -- %s", newFlow.LastSeenTimestamp)
-		//t := timestamp.FromProtobuf(newFlow.LastSeenTimestamp)
+		// t := timestamp.FromProtobuf(newFlow.LastSeenTimestamp)
 		//if newFlow.LastSeenTimestamp == nil {
 		//	t = now
 		//}

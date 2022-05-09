@@ -576,7 +576,7 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	var rows pgx.Rows
 	var err error
 
-	//log.Info("SHREWS -- GetFlowsForDeployment")
+	// log.Info("SHREWS -- GetFlowsForDeployment")
 	//log.Infof("SHREWS -- %s", getByDeploymentStmt)
 	//log.Infof("SHREWS -- %s", deploymentID)
 	//log.Infof("SHREWS -- %s", s.clusterID)
@@ -589,7 +589,7 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 
 	flows, err := s.readRows(rows, nil)
 
-	//log.Infof("SHREWS -- GetFlowsForDeployment -- num flows => %d", len(flows))
+	// log.Infof("SHREWS -- GetFlowsForDeployment -- num flows => %d", len(flows))
 
 	return flows, err
 }

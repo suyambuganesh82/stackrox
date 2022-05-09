@@ -7,14 +7,16 @@ import services.NetworkBaselineService
 import util.NetworkGraphUtil
 
 import org.junit.experimental.categories.Category
-import spock.lang.Ignore
 import spock.lang.Retry
 import util.Timer
+import spock.lang.Ignore
 
 @Retry(count = 0)
 class NetworkBaselineTest extends BaseSpecification {
     static final private String SERVER_DEP_NAME = "net-bl-server"
     static final private String BASELINED_CLIENT_DEP_NAME = "net-bl-client-baselined"
+    static final private String SERVER_USER_DEP_NAME = "net-bl-user-server"
+    static final private String BASELINED_USER_CLIENT_DEP_NAME = "net-bl-user-client-baselined"
     static final private String ANOMALOUS_CLIENT_DEP_NAME = "net-bl-client-anomalous"
     static final private String DEFERRED_BASELINED_CLIENT_DEP_NAME = "net-bl-client-deferred-baselined"
     static final private String DEFERRED_POST_LOCK_DEP_NAME = "net-bl-client-post-lock"
@@ -22,7 +24,7 @@ class NetworkBaselineTest extends BaseSpecification {
     static final private String NGINX_IMAGE = "quay.io/rhacs-eng/qa:nginx-1.19-alpine"
 
     // The baseline generation duration must be changed from the default for this test to succeed.
-    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 200
+    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 240
 
     static final private int CLOCK_SKEW_ALLOWANCE_SECONDS = 15
 
@@ -42,6 +44,22 @@ class NetworkBaselineTest extends BaseSpecification {
                 .setCommand(["/bin/sh", "-c",])
                 .setArgs(
                     ["for i in \$(seq 1 10); do wget -S http://${SERVER_DEP_NAME}; sleep 1; done; sleep 1000" as String]
+                )
+
+    static final private SERVER_USER_DEP = createAndRegisterDeployment()
+                    .setName(SERVER_USER_DEP_NAME)
+                    .setImage(NGINX_IMAGE)
+                    .addLabel("app", SERVER_USER_DEP_NAME)
+                    .addPort(80)
+                    .setExposeAsService(true)
+
+    static final private BASELINED_USER_CLIENT_DEP = createAndRegisterDeployment()
+                .setName(BASELINED_USER_CLIENT_DEP_NAME)
+                .setImage(NGINX_IMAGE)
+                .addLabel("app", BASELINED_USER_CLIENT_DEP_NAME)
+                .setCommand(["/bin/sh", "-c",])
+                .setArgs(
+                    ["for i in \$(seq 1 10); do wget -S http://${SERVER_USER_DEP_NAME}; sleep 1; done; sleep 1000" as String]
                 )
 
     static final private ANOMALOUS_CLIENT_DEP = createAndRegisterDeployment()
@@ -181,7 +199,7 @@ class NetworkBaselineTest extends BaseSpecification {
         println "Deferred Baseline: ${deferredBaselinedClientDeploymentID}"
         // Need to chill out until the observation period ends
 
-        sleep 120000
+        sleep 90000
         println "Back from a nap"
 
         assert NetworkGraphUtil.checkForEdge(deferredBaselinedClientDeploymentID, serverDeploymentID, null, 180)
@@ -228,7 +246,7 @@ class NetworkBaselineTest extends BaseSpecification {
         println "Post Lock Deployment: ${postLockClientDeploymentID}"
         // Need to chill out until the observation period ends
 
-        sleep 120000
+        sleep 90000
         println "Back from a nap"
 
         assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)
@@ -253,21 +271,79 @@ class NetworkBaselineTest extends BaseSpecification {
 
         then:
         "Validate the locked baselines"
+        // Post lock should not be added as a peer because serverBaseline is locked.
         validateBaseline(serverBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
             [new Tuple2<String, Boolean>(baselinedClientDeploymentID, true),
-             // Baseline was locked, so post lock client should not be added.
-             new Tuple2<String, Boolean>(postLockClientDeploymentID, false),
+             new Tuple2<String, Boolean>(deferredBaselinedClientDeploymentID, true),
             ]
         )
-        validateBaseline(deferredBaselinedClientBaseline, beforeDeferredCreate, justAfterDeferredCreate,
-            [new Tuple2<String, Boolean>(serverDeploymentID, false)])
+        validateBaseline(postLockClientBaseline, beforeDeferredCreate, justAfterDeferredCreate,
+            [])
     }
 
-//     @Category(NetworkBaseline)
-//     def "Verify user lock"() {
-//     }
-//
-//     @Category(NetworkBaseline)
-//     def "Verify user get for non-existent baseline"() {
-//     }
+    @Category(NetworkBaseline)
+    def "Verify user get for non-existent baseline"() {
+        when:
+        "Create initial set of deployments, wait for baseline to populate"
+        def beforeDeploymentCreate = System.currentTimeSeconds()
+        batchCreate([SERVER_USER_DEP, BASELINED_USER_CLIENT_DEP])
+        def justAfterDeploymentCreate = System.currentTimeSeconds()
+
+        def serverDeploymentID = SERVER_USER_DEP.deploymentUid
+        assert serverDeploymentID != null
+
+        def baselinedClientDeploymentID = BASELINED_USER_CLIENT_DEP.deploymentUid
+        assert baselinedClientDeploymentID != null
+
+        println "Deployment IDs Server: ${serverDeploymentID}, " +
+                    "Baselined client: ${baselinedClientDeploymentID}"
+
+        def serverBaseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
+        println "Requested Baseline: ${serverBaseline}"
+        assert serverBaseline
+
+        def baselinedClientBaseline = NetworkBaselineService.getNetworkBaseline(baselinedClientDeploymentID)
+        assert baselinedClientBaseline
+
+        assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
+
+        sleep 60000
+
+        serverBaseline = evaluateWithRetry(20, 3) {
+            def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
+            if (baseline.getPeersCount() == 0) {
+                throw new RuntimeException(
+                    "No peers in baseline for deployment ${serverDeploymentID} yet. Baseline is ${baseline}"
+                )
+            }
+            return baseline
+        }
+
+        baselinedClientBaseline = NetworkBaselineService.getNetworkBaseline(baselinedClientDeploymentID)
+
+        then:
+        "Validate user requested server baseline"
+        // The anomalous client->server connection should not be baselined since the anonymous client
+        // sleeps for a time period longer than the observation period before connecting to the server.
+        validateBaseline(serverBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
+            [new Tuple2<String, Boolean>(baselinedClientDeploymentID, true)])
+        validateBaseline(baselinedClientBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
+            [new Tuple2<String, Boolean>(serverDeploymentID, false)]
+        )
+
+//         def serverBaseline = evaluateWithRetry(20, 3) {
+//             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
+//             if (baseline.getPeersCount() == 0) {
+//                 throw new RuntimeException(
+//                     "No peers in baseline for deployment ${serverDeploymentID} yet. Baseline is ${baseline}"
+//                 )
+//             }
+//             return baseline
+//         }
+//         assert serverBaseline
+
+//         then:
+//         "Validate user requested baseline"
+//         assert baseline
+    }
 }
