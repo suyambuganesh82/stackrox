@@ -22,7 +22,7 @@ class NetworkBaselineTest extends BaseSpecification {
     static final private String NGINX_IMAGE = "quay.io/rhacs-eng/qa:nginx-1.19-alpine"
 
     // The baseline generation duration must be changed from the default for this test to succeed.
-    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 240
+    static final private int EXPECTED_BASELINE_DURATION_SECONDS = 200
 
     static final private int CLOCK_SKEW_ALLOWANCE_SECONDS = 15
 
@@ -181,7 +181,7 @@ class NetworkBaselineTest extends BaseSpecification {
         println "Deferred Baseline: ${deferredBaselinedClientDeploymentID}"
         // Need to chill out until the observation period ends
 
-        sleep 180000
+        sleep 120000
         println "Back from a nap"
 
         assert NetworkGraphUtil.checkForEdge(deferredBaselinedClientDeploymentID, serverDeploymentID, null, 180)
@@ -228,7 +228,7 @@ class NetworkBaselineTest extends BaseSpecification {
         println "Post Lock Deployment: ${postLockClientDeploymentID}"
         // Need to chill out until the observation period ends
 
-        sleep 210000
+        sleep 120000
         println "Back from a nap"
 
         assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)

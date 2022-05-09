@@ -88,6 +88,7 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		}
 		// If even one baseline is user-locked, no updates based on flows.
 		if baselineInfo.UserLocked {
+			log.Infof("SHREWS -- user lock -- deployment %s", baselineInfo.DeploymentName)
 			return false
 		}
 		// If at least one baseline is in observation and neither baseline
@@ -99,14 +100,6 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		log.Infof("SHREWS observation end %s", baselineInfo.ObservationPeriodEnd)
 		log.Infof("SHREWS -- updateTS -- %s", updateTS)
 		//}
-
-		// TODO SHREWS:  Figure out something better
-		// Deployment Observation expired OR user requested a baseline;
-		// so we shouldUpdate the deployments involved.
-		if initialLoad {
-			atLeastOneBaselineInObservationPeriod = true
-			continue
-		}
 
 		// It is possible that the last time stamp on the flow is nil if the connection is initial and still open
 		// In those cases updateTS will be 0 because that is the nil value of a MicroTS.  So all flows in such a state
@@ -270,6 +263,7 @@ func (m *manager) processFlowUpdate(flows map[networkgraph.NetworkConnIndicator]
 			}
 		}
 	}
+	log.Infof("SHREWS -- modifiedDeploymentIDs %s", modifiedDeploymentIDs)
 	return m.persistNetworkBaselines(modifiedDeploymentIDs, nil)
 }
 
@@ -762,6 +756,12 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 		ForbiddenPeers:       make(map[networkbaseline.Peer]struct{}),
 	}
 
+	// Save the empty baseline because we may not be able to update it if all its connections are locked.
+	err := m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
+	if err != nil {
+		return err
+	}
+
 	// Grab flows related to deployment
 	flows, err := flowStore.GetFlowsForDeployment(managerCtx, deploymentID, false)
 	if err != nil {
@@ -777,12 +777,6 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 		// then simply call processFlowUpdate with the map of flows.
 		err = m.processFlowUpdate(flowMap, true)
-		if err != nil {
-			return err
-		}
-	} else {
-		log.Infof("SHREWS -- NO FLOWS -- %s", deploymentName)
-		err = m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
 		if err != nil {
 			return err
 		}
