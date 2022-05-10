@@ -24,26 +24,24 @@ type DeploymentObservationQueue interface {
 	Pull() *DeploymentObservation
 	Peek() *DeploymentObservation
 	Push(observation *DeploymentObservation)
+	PutBackInObservation(observation *DeploymentObservation)
 	RemoveDeployment(deploymentID string)
-	RemoveDeploymentsForCluster(clusterID string)
 	RemoveFromObservation(deploymentID string)
 	GetObservationDetails(deploymentID string) *DeploymentObservation
 }
 
 // deploymentObservationQueue queue for deployments in observation window
 type deploymentObservationQueueImpl struct {
-	mutex                sync.Mutex
-	queue                *list.List
-	deploymentMap        map[string]*list.Element
-	deploymentClusterMap map[string]string
+	mutex         sync.Mutex
+	queue         *list.List
+	deploymentMap map[string]*list.Element
 }
 
 // New creates a new instance of the queue
 func New() DeploymentObservationQueue {
 	return &deploymentObservationQueueImpl{
-		queue:                list.New(),
-		deploymentMap:        make(map[string]*list.Element),
-		deploymentClusterMap: make(map[string]string),
+		queue:         list.New(),
+		deploymentMap: make(map[string]*list.Element),
 	}
 }
 
@@ -100,12 +98,24 @@ func (q *deploymentObservationQueueImpl) Push(observation *DeploymentObservation
 	depObj := q.queue.PushBack(observation)
 	// Reference the list object in the deployment map
 	q.deploymentMap[observation.DeploymentID] = depObj
+}
 
-	// If caller is using cluster, add it to deployment Cluster map
-	if len(observation.ClusterID) > 0 {
-		q.deploymentClusterMap[observation.DeploymentID] = observation.ClusterID
+// PutBackInObservation attempts to add an item to the queue, and does nothing if object already exists.
+func (q *deploymentObservationQueueImpl) PutBackInObservation(observation *DeploymentObservation) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	// Currently observing this deployment.  Need to update the time and position in the queue
+	if depObj, found := q.deploymentMap[observation.DeploymentID]; found && depObj != nil {
+		// Remove it from the queue so we can add it back to the end
+		q.queue.Remove(depObj)
 	}
 
+	// We have either never observed this deployment OR we already completed observing.  So we simply add it to the
+	// end of the queue and replace the object in the map.
+	depObj := q.queue.PushBack(observation)
+	// Reference the list object in the deployment map
+	q.deploymentMap[observation.DeploymentID] = depObj
 }
 
 // removeListItem removes the list item associated with a deployment
@@ -124,31 +134,19 @@ func (q *deploymentObservationQueueImpl) removeListItem(deploymentID string) {
 }
 
 // RemoveDeployment removes a deployment from the list and the map
-func (q *deploymentObservationQueueImpl) RemoveDeployment(deploymentID string) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
+func (q *deploymentObservationQueueImpl) removeDeployment(deploymentID string) {
 	// remove the corresponding list items
 	q.removeListItem(deploymentID)
 
 	delete(q.deploymentMap, deploymentID)
-	delete(q.deploymentClusterMap, deploymentID)
 }
 
-// RemoveDeploymentsForCluster removes all deployments associated with a cluster from the list and the map
-func (q *deploymentObservationQueueImpl) RemoveDeploymentsForCluster(clusterID string) {
+// RemoveDeployment removes a deployment from the list and the map
+func (q *deploymentObservationQueueImpl) RemoveDeployment(deploymentID string) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	for deploymentID, mappedClusterID := range q.deploymentClusterMap {
-		if clusterID == mappedClusterID {
-			// remove the corresponding list items
-			q.removeListItem(deploymentID)
-
-			delete(q.deploymentMap, deploymentID)
-			delete(q.deploymentClusterMap, deploymentID)
-		}
-	}
+	q.removeDeployment(deploymentID)
 }
 
 // RemoveFromObservation removes a deployment from observation

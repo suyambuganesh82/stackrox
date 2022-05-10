@@ -107,11 +107,16 @@ func (s *NetworkBaselineServiceTestSuite) TestGetNetworkBaselineStatusForFlows()
 		},
 	}
 
-	// Id we don't have any baseline, it should throw error since baselines
-	// should have been created when deployments are created
+	// If we don't have any baseline, then it is in observation and not created yet, so we will create
+	// one
+	// First call returns not found
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(nil, false, nil)
-	_, err := s.service.GetNetworkBaselineStatusForFlows(allAllowedCtx, request)
-	s.Error(err, "network baseline for the deployment does not exist")
+	s.manager.EXPECT().CreateNetworkBaseline(request.GetDeploymentId()).Return(nil)
+	// Second call returns a baseline that was created in the call to CreateNetworkBaseline
+	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
+	testBase, err := s.service.GetNetworkBaselineStatusForFlows(allAllowedCtx, request)
+	s.Nil(err)
+	s.NotNil(testBase)
 
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
 	rsp, err := s.service.GetNetworkBaselineStatusForFlows(allAllowedCtx, request)

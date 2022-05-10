@@ -307,11 +307,12 @@ class NetworkBaselineTest extends BaseSpecification {
 
         assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
 
-        sleep 60000
-
-        serverBaseline = evaluateWithRetry(20, 3) {
+//         sleep 60000
+        // Waiting on it to come out of observation.
+        serverBaseline = evaluateWithRetry(30, 3) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
-            if (baseline.getPeersCount() == 0) {
+            def now = System.currentTimeSeconds()
+            if (baseline.getPeersCount() == 0 && baseline.getObservationPeriodEnd().getSeconds() > now) {
                 throw new RuntimeException(
                     "No peers in baseline for deployment ${serverDeploymentID} yet. Baseline is ${baseline}"
                 )
@@ -330,20 +331,5 @@ class NetworkBaselineTest extends BaseSpecification {
         validateBaseline(baselinedClientBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
             [new Tuple2<String, Boolean>(serverDeploymentID, false)]
         )
-
-//         def serverBaseline = evaluateWithRetry(20, 3) {
-//             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
-//             if (baseline.getPeersCount() == 0) {
-//                 throw new RuntimeException(
-//                     "No peers in baseline for deployment ${serverDeploymentID} yet. Baseline is ${baseline}"
-//                 )
-//             }
-//             return baseline
-//         }
-//         assert serverBaseline
-
-//         then:
-//         "Validate user requested baseline"
-//         assert baseline
     }
 }

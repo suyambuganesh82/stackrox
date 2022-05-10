@@ -7,14 +7,11 @@ import (
 	"github.com/stackrox/rox/central/networkbaseline/store"
 	"github.com/stackrox/rox/central/role/resources"
 	"github.com/stackrox/rox/generated/storage"
-	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/sac"
 )
 
 var (
 	networkBaselineSAC = sac.ForResource(resources.NetworkBaseline)
-
-	log = logging.LoggerForModule()
 )
 
 type dataStoreImpl struct {
@@ -50,7 +47,6 @@ type clusterIDNSPair struct {
 }
 
 func (ds *dataStoreImpl) UpsertNetworkBaselines(ctx context.Context, baselines []*storage.NetworkBaseline) error {
-	log.Infof("SHREWS -- UpsertNetworkBaselines -- %d", len(baselines))
 	// For simplicity, do nothing and return an error unless the context can write all baselines that are passed in.
 	allowedScopes := make(map[clusterIDNSPair]struct{})
 	for _, baseline := range baselines {
@@ -65,7 +61,7 @@ func (ds *dataStoreImpl) UpsertNetworkBaselines(ctx context.Context, baselines [
 		}
 		allowedScopes[pair] = struct{}{}
 	}
-	log.Infof("SHREWS -- UpsertNetworkBaselines --  OUT --  %d", len(baselines))
+
 	return ds.storage.UpsertMany(ctx, baselines)
 }
 

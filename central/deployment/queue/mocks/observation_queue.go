@@ -102,6 +102,18 @@ func (mr *MockDeploymentObservationQueueMockRecorder) Push(observation interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Push", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).Push), observation)
 }
 
+// PutBackInObservation mocks base method.
+func (m *MockDeploymentObservationQueue) PutBackInObservation(observation *queue.DeploymentObservation) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "PutBackInObservation", observation)
+}
+
+// PutBackInObservation indicates an expected call of PutBackInObservation.
+func (mr *MockDeploymentObservationQueueMockRecorder) PutBackInObservation(observation interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBackInObservation", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).PutBackInObservation), observation)
+}
+
 // RemoveDeployment mocks base method.
 func (m *MockDeploymentObservationQueue) RemoveDeployment(deploymentID string) {
 	m.ctrl.T.Helper()
@@ -112,18 +124,6 @@ func (m *MockDeploymentObservationQueue) RemoveDeployment(deploymentID string) {
 func (mr *MockDeploymentObservationQueueMockRecorder) RemoveDeployment(deploymentID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDeployment", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).RemoveDeployment), deploymentID)
-}
-
-// RemoveDeploymentsForCluster mocks base method.
-func (m *MockDeploymentObservationQueue) RemoveDeploymentsForCluster(clusterID string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RemoveDeploymentsForCluster", clusterID)
-}
-
-// RemoveDeploymentsForCluster indicates an expected call of RemoveDeploymentsForCluster.
-func (mr *MockDeploymentObservationQueueMockRecorder) RemoveDeploymentsForCluster(clusterID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDeploymentsForCluster", reflect.TypeOf((*MockDeploymentObservationQueue)(nil).RemoveDeploymentsForCluster), clusterID)
 }
 
 // RemoveFromObservation mocks base method.
