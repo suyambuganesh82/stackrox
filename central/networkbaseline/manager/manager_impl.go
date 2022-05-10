@@ -55,6 +55,7 @@ type manager struct {
 	clusterFlows      networkFlowDS.ClusterDataStore
 	connectionManager connection.Manager
 
+	// TODO SHREWS:  move from this map and observation queue to networkbaselines cache
 	baselinesByDeploymentID map[string]*networkbaseline.BaselineInfo
 	seenNetworkPolicies     set.Uint64Set
 	lock                    sync.Mutex
@@ -96,11 +97,23 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		log.Infof("SHREWS observation end %s", baselineInfo.ObservationPeriodEnd)
 		log.Infof("SHREWS -- updateTS -- %s", updateTS)
 
-		// If both baselines have been created AND at least one baseline is in observation or in initial load
-		// and neither baseline is user locked then we update based on the flows.  This includes if
-		// one of the baselines is "soft" locked due to the observation period
-		// having ended for that baseline.
-		if m.deploymentObservationQueue.InObservation(entity.ID) || initialLoad {
+		// It is possible that the last time stamp on the flow is nil if the connection is initial and still open
+		// In those cases updateTS will be 0 because that is the nil value of a MicroTS.  So all flows in such a state
+		// would think the baseline is out of observation or not when we compare the time as we do below.  To resolve
+		// these cases we compare to now if the timestamp is 0 to ensure we don't add a flow to a baseline that is
+		// no longer being observed.
+		compareTime := updateTS
+		if compareTime == 0 {
+			compareTime = timestamp.Now()
+		}
+
+		// If the last time the flow was seen is nil, then updateTS will be 0 and thus
+		// the baseline will always report being in observation.
+		// Additionally, we could be in an initial load state where Deployment Observation expired
+		// OR user requested a baseline; so we shouldUpdate the deployments involved.
+		// Additionally, it is possible that by the time we get the flow from sensor that the observation window
+		// has ended.  So we still need to compare based on the time of the flow vs just checking the observation queue.
+		if baselineInfo.ObservationPeriodEnd.After(compareTime) || initialLoad {
 			atLeastOneBaselineInObservationPeriod = true
 		}
 		log.Infof("SHREWS -- %t", atLeastOneBaselineInObservationPeriod)
@@ -639,12 +652,14 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 		return err
 	}
 	// Delete from cache
+	m.deploymentObservationQueue.RemoveDeploymentsForCluster(clusterID)
 	for deploymentID := range deletingBaselines {
 		delete(m.baselinesByDeploymentID, deploymentID)
+		// If we have processed the item from the observation queue, we won't know what cluster it belongs to.
+		// Since we have the list here that we have processed, we can use that to clean up the processed deployments
+		// from the observation queue.
+		m.deploymentObservationQueue.RemoveDeployment(deploymentID)
 	}
-
-	// Remove all deployments for this cluster from the observation queue
-	// TODO SHREWS:  Need to track all the
 
 	return nil
 }

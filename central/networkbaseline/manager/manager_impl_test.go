@@ -24,7 +24,6 @@ import (
 	"github.com/stackrox/rox/pkg/networkgraph/networkbaseline"
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/search"
-	"github.com/stackrox/rox/pkg/set"
 	"github.com/stackrox/rox/pkg/sync"
 	"github.com/stackrox/rox/pkg/timestamp"
 	"github.com/stretchr/testify/suite"
@@ -121,18 +120,7 @@ func (suite *ManagerTestSuite) mustInitManager(initialBaselines ...*storage.Netw
 	}
 	var err error
 	suite.networkPolicyDS.EXPECT().GetNetworkPolicies(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	//suite.m, err = New(suite.ds, suite.networkEntities, suite.deploymentDS, suite.networkPolicyDS, suite.clusterFlows, suite.connectionManager)
-	suite.m = &manager{
-		ds:                         suite.ds,
-		networkEntities:            suite.networkEntities,
-		deploymentDS:               suite.deploymentDS,
-		networkPolicyDS:            suite.networkPolicyDS,
-		clusterFlows:               suite.clusterFlows,
-		connectionManager:          suite.connectionManager,
-		seenNetworkPolicies:        set.NewUint64Set(),
-		deploymentObservationQueue: suite.deploymentObservationQueue,
-		baselineFlushTicker:        time.NewTicker(baselineFlushTickerDuration),
-	}
+	suite.m, err = New(suite.ds, suite.networkEntities, suite.deploymentDS, suite.networkPolicyDS, suite.clusterFlows, suite.connectionManager)
 	suite.Require().NoError(err)
 }
 
@@ -814,22 +802,15 @@ func expectOneTimeCallToConnectionManagerWithBaseline(suite *ManagerTestSuite, b
 		connectionManager.
 		EXPECT().
 		SendMessage(
-			gomock.Any(),
-			gomock.Any()).
-		Return(nil).AnyTimes()
-	//suite.
-	//	connectionManager.
-	//	EXPECT().
-	//	SendMessage(
-	//		baseline.GetClusterId(),
-	//		&central.MsgToSensor{
-	//			Msg: &central.MsgToSensor_NetworkBaselineSync{
-	//				NetworkBaselineSync: &central.NetworkBaselineSync{
-	//					NetworkBaselines: []*storage.NetworkBaseline{baseline},
-	//				},
-	//			},
-	//		}).
-	//	Return(nil)
+			baseline.GetClusterId(),
+			&central.MsgToSensor{
+				Msg: &central.MsgToSensor_NetworkBaselineSync{
+					NetworkBaselineSync: &central.NetworkBaselineSync{
+						NetworkBaselines: []*storage.NetworkBaseline{baseline},
+					},
+				},
+			}).
+		Return(nil)
 }
 
 func ctxWithAccessToWrite(id int) context.Context {
