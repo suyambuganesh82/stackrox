@@ -160,7 +160,6 @@ func (suite *ManagerTestSuite) mustGetObserationPeriod(baselineID int) timestamp
 	return timestamp.FromProtobuf(baseline.GetObservationPeriodEnd())
 }
 
-// TODO SHREWS: Look over these tests and make sure I have them set up in a way that makes sense for the new paradigm
 func (suite *ManagerTestSuite) initBaselinesForDeployments(ids ...int) {
 	for _, id := range ids {
 		suite.deploymentDS.EXPECT().GetDeployment(gomock.Any(), depID(id)).Return(
@@ -200,7 +199,6 @@ func (suite *ManagerTestSuite) processFlowUpdate(inObsPeriodFlows []networkgraph
 }
 
 func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkBaseline) {
-	// log.Infof("SHREWS -- assertBaselinesAre 1 %s", baselines)
 	baselinesWithoutObsPeriod := make([]*storage.NetworkBaseline, 0, len(suite.ds.baselines))
 	obsPeriodStart := suite.currTestStart.Add(env.NetworkBaselineObservationPeriod.DurationSetting())
 	// Assume that the test takes no longer than one minute.
@@ -213,7 +211,6 @@ func (suite *ManagerTestSuite) assertBaselinesAre(baselines ...*storage.NetworkB
 		cloned.ObservationPeriodEnd = nil
 		baselinesWithoutObsPeriod = append(baselinesWithoutObsPeriod, cloned)
 	}
-	// log.Infof("SHREWS -- assertBaselinesAre 3 %s", baselinesWithoutObsPeriod)
 	suite.ElementsMatch(baselinesWithoutObsPeriod, baselines)
 }
 

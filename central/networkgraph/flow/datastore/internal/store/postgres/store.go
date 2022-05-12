@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/types"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stackrox/rox/central/globaldb"
 	"github.com/stackrox/rox/central/metrics"
@@ -48,10 +48,8 @@ const (
 	getSinceStmt         = "SELECT nf.Props_SrcEntity_Type, nf.Props_SrcEntity_Id, nf.Props_DstEntity_Type, nf.Props_DstEntity_Id, nf.Props_DstPort, nf.Props_L4Protocol, nf.LastSeenTimestamp, nf.ClusterId FROM networkflow nf " + joinStmt + " WHERE (nf.LastSeenTimestamp >= $1 OR nf.LastSeenTimestamp IS NULL) AND nf.ClusterId = $2"
 	deleteDeploymentStmt = "DELETE FROM networkflow WHERE ClusterId = $1 AND ((Props_SrcEntity_Type = 1 AND Props_SrcEntity_Id = $2) OR (Props_DstEntity_Type = 1 AND Props_DstEntity_Id = $2))"
 
-	// TODO SHREWS:
-	// This might be SLOW
-	// Need to run analyze on it.  Also may be better to hit 1 query for destination and a separate one for src to hit the indexes.
-	// Could also move some of the logic to the join so the records are reduced more quickly.
+	// This seemed OK in scale and long running tests because it is not executed that frequently.  A metric
+	// for this was added so we can keep an eye on the time and adjust if necessary.
 	getByDeploymentStmt = "SELECT nf.Props_SrcEntity_Type, nf.Props_SrcEntity_Id, nf.Props_DstEntity_Type, nf.Props_DstEntity_Id, nf.Props_DstPort, nf.Props_L4Protocol, nf.LastSeenTimestamp, nf.ClusterId FROM networkflow nf " + joinStmt +
 		" WHERE ((nf.Props_SrcEntity_Type = 1 AND nf.Props_SrcEntity_Id = $1) OR (nf.Props_DstEntity_Type = 1 AND nf.Props_DstEntity_Id = $1)) AND nf.ClusterId = $2"
 )
@@ -576,10 +574,6 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	var rows pgx.Rows
 	var err error
 
-	// log.Info("SHREWS -- GetFlowsForDeployment")
-	//log.Infof("SHREWS -- %s", getByDeploymentStmt)
-	//log.Infof("SHREWS -- %s", deploymentID)
-	//log.Infof("SHREWS -- %s", s.clusterID)
 	rows, err = s.db.Query(ctx, getByDeploymentStmt, deploymentID, s.clusterID)
 
 	if err != nil {
@@ -588,8 +582,6 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 	defer rows.Close()
 
 	flows, err := s.readRows(rows, nil)
-
-	// log.Infof("SHREWS -- GetFlowsForDeployment -- num flows => %d", len(flows))
 
 	return flows, err
 }
