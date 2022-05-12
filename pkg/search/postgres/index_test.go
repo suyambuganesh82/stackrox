@@ -37,7 +37,7 @@ type IndexSuite struct {
 	pool    *pgxpool.Pool
 	store   postgres.Store
 	indexer interface {
-		Search(q *v1.Query, opts ...blevesearch.SearchOption) ([]search.Result, error)
+		Search(ctx context.Context, q *v1.Query, opts ...blevesearch.SearchOption) ([]search.Result, error)
 	}
 }
 

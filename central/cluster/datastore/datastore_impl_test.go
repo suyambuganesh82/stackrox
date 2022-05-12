@@ -245,7 +245,7 @@ func (suite *ClusterDataStoreTestSuite) TestAllowsGet() {
 
 func (suite *ClusterDataStoreTestSuite) TestEnforcesGetAll() {
 	suite.clusters.EXPECT().GetMany(gomock.Any(), []string{}).Return(nil, nil, nil)
-	suite.indexer.EXPECT().Search(gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
 	suite.healthStatuses.EXPECT().GetMany(gomock.Any(), gomock.Any()).Return([]*storage.ClusterHealthStatus{}, []int{}, nil)
 
 	clusters, err := suite.clusterDataStore.GetClusters(suite.hasNoneCtx)
@@ -269,7 +269,7 @@ func (suite *ClusterDataStoreTestSuite) TestAllowsGetAll() {
 
 func (suite *ClusterDataStoreTestSuite) TestEnforcesCount() {
 	suite.clusters.EXPECT().Count(suite.hasWriteCtx).Times(0)
-	suite.indexer.EXPECT().Search(gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
 
 	count, err := suite.clusterDataStore.CountClusters(suite.hasNoneCtx)
 	suite.NoError(err, "expected no error, should return 0 without access")
@@ -382,7 +382,7 @@ func (suite *ClusterDataStoreTestSuite) TestAllowsUpdateClusterStatus() {
 }
 
 func (suite *ClusterDataStoreTestSuite) TestEnforcesSearch() {
-	suite.indexer.EXPECT().Search(gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
 
 	clusters, err := suite.clusterDataStore.Search(suite.hasNoneCtx, search.EmptyQuery())
 	suite.NoError(err, "expected no error, should return nil without access")
