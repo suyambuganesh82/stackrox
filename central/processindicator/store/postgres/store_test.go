@@ -239,6 +239,39 @@ func (s *ProcessIndicatorsStoreSuite) TestSACExists() {
 	}
 }
 
+func (s *ProcessIndicatorsStoreSuite) TestSACGet() {
+	objA := &storage.ProcessIndicator{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.ProcessIndicator{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string]bool{
+		withAllAccess:           true,
+		withNoAccess:            false,
+		withNoAccessToCluster:   false,
+		withAccessToDifferentNs: false,
+		withAccess:              true,
+		withAccessToCluster:     true,
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, exists, err := s.store.Get(ctxs[name], objA.GetId())
+			assert.NoError(t, err)
+			assert.Equal(t, expected, exists)
+			if expected == true {
+				assert.Equal(t, objA, actual)
+			} else {
+				assert.Nil(t, actual)
+			}
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"
