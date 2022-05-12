@@ -127,6 +127,10 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 }
 
 func (m *manager) maybeAddPeer(deploymentID string, p *networkbaseline.Peer, modifiedDeploymentIDs set.StringSet) {
+	if baseline, found := m.baselinesByDeploymentID[deploymentID]; !found || baseline.baselineInfo == nil {
+		return
+	}
+
 	_, isForbidden := m.baselinesByDeploymentID[deploymentID].baselineInfo.ForbiddenPeers[*p]
 	if isForbidden {
 		return
@@ -146,6 +150,10 @@ func (m *manager) persistNetworkBaselines(deploymentIDs set.StringSet, baselines
 	baselines := make([]*storage.NetworkBaseline, 0, len(deploymentIDs))
 	for deploymentID := range deploymentIDs {
 		baseline := m.baselinesByDeploymentID[deploymentID]
+		if baseline.baselineInfo == nil {
+			continue
+		}
+
 		peers, err := networkbaseline.ConvertPeersToProto(baseline.baselineInfo.BaselinePeers)
 		if err != nil {
 			return err
@@ -644,7 +652,9 @@ func (m *manager) processPostClusterDelete(clusterID string) error {
 	// Clean up edges in other baselines
 	modifiedBaselines := set.NewStringSet()
 	for deploymentID, baseline := range m.baselinesByDeploymentID {
-		if deletingBaselines.Contains(deploymentID) {
+		// If we are looking at a baseline that has not been processed yet, we do not
+		// need to look for peers.
+		if deletingBaselines.Contains(deploymentID) || baseline.baselineInfo == nil {
 			continue
 		}
 		// Baselines that are not deleted. Need to update their edges in case
