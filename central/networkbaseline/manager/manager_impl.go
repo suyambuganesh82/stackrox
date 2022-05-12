@@ -315,38 +315,42 @@ func (m *manager) processDeploymentDelete(deploymentID string) error {
 		return nil
 	}
 
-	modifiedDeployments := set.NewStringSet()
-	for peer := range deletingBaseline.baselineInfo.BaselinePeers {
-		// Delete the edge from that deployment to this deployment
-		peerBaseline, peerFound := m.baselinesByDeploymentID[peer.Entity.ID]
-		if !peerFound || peerBaseline.baselineInfo == nil {
-			// Probably the peer is not a deployment
-			continue
+	// If the deployment is being tracked, but the baseline is not yet created, we cannot look at hte peers.  If we
+	// have a peer at all, then the peer will have been created
+	if deletingBaseline.baselineInfo != nil {
+		modifiedDeployments := set.NewStringSet()
+		for peer := range deletingBaseline.baselineInfo.BaselinePeers {
+			// Delete the edge from that deployment to this deployment
+			peerBaseline, peerFound := m.baselinesByDeploymentID[peer.Entity.ID]
+			if !peerFound || peerBaseline.baselineInfo == nil {
+				// Probably the peer is not a deployment
+				continue
+			}
+			reversedPeer := networkbaseline.ReversePeerView(deploymentID, deletingBaseline.baselineInfo.DeploymentName, &peer)
+			delete(peerBaseline.baselineInfo.BaselinePeers, reversedPeer)
+			modifiedDeployments.Add(peer.Entity.ID)
 		}
-		reversedPeer := networkbaseline.ReversePeerView(deploymentID, deletingBaseline.baselineInfo.DeploymentName, &peer)
-		delete(peerBaseline.baselineInfo.BaselinePeers, reversedPeer)
-		modifiedDeployments.Add(peer.Entity.ID)
-	}
-	// For now delete this deployment record from the forbidden peers as well. If we need
-	// the records to be sticky for any reason, remove the following lines
-	for forbiddenPeer := range deletingBaseline.baselineInfo.ForbiddenPeers {
-		forbiddenPeerBaseline, found := m.baselinesByDeploymentID[forbiddenPeer.Entity.ID]
-		if !found || forbiddenPeerBaseline.baselineInfo == nil {
-			// Probably the forbidden peer is not a deployment
-			continue
+		// For now delete this deployment record from the forbidden peers as well. If we need
+		// the records to be sticky for any reason, remove the following lines
+		for forbiddenPeer := range deletingBaseline.baselineInfo.ForbiddenPeers {
+			forbiddenPeerBaseline, found := m.baselinesByDeploymentID[forbiddenPeer.Entity.ID]
+			if !found || forbiddenPeerBaseline.baselineInfo == nil {
+				// Probably the forbidden peer is not a deployment
+				continue
+			}
+			reversedPeer := networkbaseline.ReversePeerView(deploymentID, deletingBaseline.baselineInfo.DeploymentName, &forbiddenPeer)
+			delete(forbiddenPeerBaseline.baselineInfo.ForbiddenPeers, reversedPeer)
+			modifiedDeployments.Add(forbiddenPeer.Entity.ID)
 		}
-		reversedPeer := networkbaseline.ReversePeerView(deploymentID, deletingBaseline.baselineInfo.DeploymentName, &forbiddenPeer)
-		delete(forbiddenPeerBaseline.baselineInfo.ForbiddenPeers, reversedPeer)
-		modifiedDeployments.Add(forbiddenPeer.Entity.ID)
+
+		// Delete the records from other baselines first, then delete the wanted baseline after
+		err := m.persistNetworkBaselines(modifiedDeployments, nil)
+		if err != nil {
+			return errors.Wrapf(err, "deleting baseline of deployment %q", deletingBaseline.baselineInfo.DeploymentName)
+		}
 	}
 
-	// Delete the records from other baselines first, then delete the wanted baseline after
-	err := m.persistNetworkBaselines(modifiedDeployments, nil)
-	if err != nil {
-		return errors.Wrapf(err, "deleting baseline of deployment %q", deletingBaseline.baselineInfo.DeploymentName)
-	}
-
-	err = m.ds.DeleteNetworkBaseline(managerCtx, deploymentID)
+	err := m.ds.DeleteNetworkBaseline(managerCtx, deploymentID)
 	if err != nil {
 		return errors.Wrapf(err, "deleting baseline of deployment %q", deletingBaseline.baselineInfo.DeploymentName)
 	}
