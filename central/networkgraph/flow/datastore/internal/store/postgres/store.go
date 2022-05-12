@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/types"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/stackrox/rox/central/globaldb"
 	"github.com/stackrox/rox/central/metrics"
