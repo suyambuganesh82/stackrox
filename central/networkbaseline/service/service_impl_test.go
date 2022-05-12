@@ -147,7 +147,8 @@ func (s *NetworkBaselineServiceTestSuite) TestGetNetworkBaseline() {
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
 	s.manager.EXPECT().CreateNetworkBaseline(gomock.Any())
 	newBase, err := s.service.GetNetworkBaseline(allAllowedCtx, &v1.ResourceByID{Id: baseline.GetDeploymentId()})
-	s.True(newBase != nil)
+	s.NotNil(newBase)
+	s.Nil(err)
 
 	s.baselines.EXPECT().GetNetworkBaseline(gomock.Any(), gomock.Any()).Return(baseline, true, nil)
 	rsp, err := s.service.GetNetworkBaseline(allAllowedCtx, &v1.ResourceByID{Id: baseline.GetDeploymentId()})
