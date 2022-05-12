@@ -459,9 +459,11 @@ func (m *manager) ProcessBaselineStatusUpdate(ctx context.Context, modifyRequest
 				reversePeer := networkbaseline.ReversePeerView(deploymentID, baseline.baselineInfo.DeploymentName, &peer)
 
 				otherBaseline := m.baselinesByDeploymentID[peer.Entity.ID]
-				otherBaseline.baselineInfo.BaselinePeers[reversePeer] = struct{}{}
-				delete(otherBaseline.baselineInfo.ForbiddenPeers, reversePeer)
-				modifiedDeploymentIDs.Add(peer.Entity.ID)
+				if otherBaseline.baselineInfo != nil {
+					otherBaseline.baselineInfo.BaselinePeers[reversePeer] = struct{}{}
+					delete(otherBaseline.baselineInfo.ForbiddenPeers, reversePeer)
+					modifiedDeploymentIDs.Add(peer.Entity.ID)
+				}
 			}
 		case v1.NetworkBaselinePeerStatus_ANOMALOUS:
 			if !inBaseline && inForbidden {
@@ -475,9 +477,11 @@ func (m *manager) ProcessBaselineStatusUpdate(ctx context.Context, modifyRequest
 				reversePeer := networkbaseline.ReversePeerView(deploymentID, baseline.baselineInfo.DeploymentName, &peer)
 
 				otherBaseline := m.baselinesByDeploymentID[peer.Entity.ID]
-				delete(otherBaseline.baselineInfo.BaselinePeers, reversePeer)
-				otherBaseline.baselineInfo.ForbiddenPeers[reversePeer] = struct{}{}
-				modifiedDeploymentIDs.Add(peer.Entity.ID)
+				if otherBaseline.baselineInfo != nil {
+					delete(otherBaseline.baselineInfo.BaselinePeers, reversePeer)
+					otherBaseline.baselineInfo.ForbiddenPeers[reversePeer] = struct{}{}
+					modifiedDeploymentIDs.Add(peer.Entity.ID)
+				}
 			}
 		default:
 			return utils.Should(errors.Errorf("unknown status: %v", peerAndStatus.GetStatus()))
