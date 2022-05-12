@@ -390,12 +390,12 @@ func (suite *ClusterDataStoreTestSuite) TestEnforcesSearch() {
 }
 
 func (suite *ClusterDataStoreTestSuite) TestAllowsSearch() {
-	suite.indexer.EXPECT().Search(gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
 
 	_, err := suite.clusterDataStore.Search(suite.hasReadCtx, search.EmptyQuery())
 	suite.NoError(err, "expected no error trying to read with permissions")
 
-	suite.indexer.EXPECT().Search(gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{{ID: "hgdskdf"}}, nil)
 
 	_, err = suite.clusterDataStore.Search(suite.hasWriteCtx, search.EmptyQuery())
 	suite.NoError(err, "expected no error trying to read with permissions")
@@ -460,7 +460,7 @@ func (suite *ClusterDataStoreTestSuite) TestPopulateClusterHealthInfo() {
 		},
 	}
 
-	suite.indexer.EXPECT().Search(gomock.Any()).Return(results, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return(results, nil)
 	suite.clusters.EXPECT().GetMany(gomock.Any(), ids).Return(clusters, []int{}, nil)
 	suite.healthStatuses.EXPECT().GetMany(gomock.Any(), ids).Return(existingHealths, []int{0, 2, 5}, nil)
 

@@ -201,7 +201,7 @@ func (s *filteredSearcherTestSuite) TestScoped() {
 }
 
 func (s *filteredSearcherTestSuite) TestMultiScoped() {
-	s.mockUnsafeSearcher.EXPECT().Search(gomock.Any()).Return([]search.Result{
+	s.mockUnsafeSearcher.EXPECT().Search(gomock.Any(), gomock.Any()).Return([]search.Result{
 		{
 			ID: id1,
 		},

@@ -96,7 +96,8 @@ type testCase struct {
 func (s *IndexSuite) runTestCases(cases []testCase) {
 	for _, c := range cases {
 		s.Run(c.desc, func() {
-			results, err := s.indexer.Search(c.q)
+			ctx := context.Background()
+			results, err := s.indexer.Search(ctx, c.q)
 			if c.expectErr {
 				s.Error(err)
 				return
@@ -673,7 +674,8 @@ type highlightTestCase struct {
 func (s *IndexSuite) runHighlightTestCases(cases []highlightTestCase) {
 	for _, c := range cases {
 		s.Run(c.desc, func() {
-			results, err := s.indexer.Search(c.q)
+			ctx := context.Background()
+			results, err := s.indexer.Search(ctx, c.q)
 			if c.expectErr {
 				s.Error(err)
 				return
@@ -1340,9 +1342,10 @@ func (s *IndexSuite) TestPagination() {
 		},
 	} {
 		s.Run(testCase.desc, func() {
+			ctx := context.Background()
 			q := search.NewQueryBuilder().AddBools(search.TestBool, true).ProtoQuery()
 			q.Pagination = testCase.pagination
-			results, err := s.indexer.Search(q)
+			results, err := s.indexer.Search(ctx, q)
 			s.Require().NoError(err)
 
 			actualMatches := make([]int, 0, len(results))
