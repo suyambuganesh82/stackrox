@@ -546,7 +546,7 @@ func (suite *ClusterDataStoreTestSuite) TestPopulateClusterHealthInfo() {
 		},
 	}
 
-	suite.indexer.EXPECT().Search(gomock.Any()).Return(results, nil)
+	suite.indexer.EXPECT().Search(gomock.Any(), gomock.Any()).Return(results, nil)
 	suite.clusters.EXPECT().GetMany(gomock.Any(), ids).Return(clusters, []int{}, nil)
 	suite.healthStatuses.EXPECT().GetMany(gomock.Any(), ids).Return(existingHealths, []int{}, nil)
 
