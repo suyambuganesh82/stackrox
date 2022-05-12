@@ -28,10 +28,8 @@ import (
 const (
 	baseTable = "risk"
 
-	deleteStmt  = "DELETE FROM risk WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM risk"
-	getManyStmt = "SELECT serialized FROM risk WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM risk WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM risk"
 	deleteManyStmt = "DELETE FROM risk WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

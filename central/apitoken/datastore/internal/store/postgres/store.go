@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "apitokens"
 
-	deleteStmt  = "DELETE FROM apitokens WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM apitokens"
-	getManyStmt = "SELECT serialized FROM apitokens WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM apitokens WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM apitokens"
 	deleteManyStmt = "DELETE FROM apitokens WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

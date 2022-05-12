@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "signatureintegrations"
 
-	deleteStmt  = "DELETE FROM signatureintegrations WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM signatureintegrations"
-	getManyStmt = "SELECT serialized FROM signatureintegrations WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM signatureintegrations WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM signatureintegrations"
 	deleteManyStmt = "DELETE FROM signatureintegrations WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "testgrandchild1"
 
-	deleteStmt  = "DELETE FROM testgrandchild1 WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM testgrandchild1"
-	getManyStmt = "SELECT serialized FROM testgrandchild1 WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM testgrandchild1 WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM testgrandchild1"
 	deleteManyStmt = "DELETE FROM testgrandchild1 WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

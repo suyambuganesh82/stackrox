@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "processwhitelistresults"
 
-	deleteStmt  = "DELETE FROM processwhitelistresults WHERE DeploymentId = $1"
-	walkStmt    = "SELECT serialized FROM processwhitelistresults"
-	getManyStmt = "SELECT serialized FROM processwhitelistresults WHERE DeploymentId = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM processwhitelistresults WHERE DeploymentId = $1"
+	walkStmt       = "SELECT serialized FROM processwhitelistresults"
 	deleteManyStmt = "DELETE FROM processwhitelistresults WHERE DeploymentId = ANY($1::text[])"
 
 	batchAfter = 100

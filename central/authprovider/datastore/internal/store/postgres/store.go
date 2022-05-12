@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "authproviders"
 
-	deleteStmt  = "DELETE FROM authproviders WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM authproviders"
-	getManyStmt = "SELECT serialized FROM authproviders WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM authproviders WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM authproviders"
 	deleteManyStmt = "DELETE FROM authproviders WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

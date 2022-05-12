@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "singlekey"
 
-	deleteStmt  = "DELETE FROM singlekey WHERE Key = $1"
-	walkStmt    = "SELECT serialized FROM singlekey"
-	getManyStmt = "SELECT serialized FROM singlekey WHERE Key = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM singlekey WHERE Key = $1"
+	walkStmt       = "SELECT serialized FROM singlekey"
 	deleteManyStmt = "DELETE FROM singlekey WHERE Key = ANY($1::text[])"
 
 	batchAfter = 100

@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "roles"
 
-	deleteStmt  = "DELETE FROM roles WHERE Name = $1"
-	walkStmt    = "SELECT serialized FROM roles"
-	getManyStmt = "SELECT serialized FROM roles WHERE Name = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM roles WHERE Name = $1"
+	walkStmt       = "SELECT serialized FROM roles"
 	deleteManyStmt = "DELETE FROM roles WHERE Name = ANY($1::text[])"
 
 	batchAfter = 100

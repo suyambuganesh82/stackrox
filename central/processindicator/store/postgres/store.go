@@ -28,10 +28,8 @@ import (
 const (
 	baseTable = "process_indicators"
 
-	deleteStmt  = "DELETE FROM process_indicators WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM process_indicators"
-	getManyStmt = "SELECT serialized FROM process_indicators WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM process_indicators WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM process_indicators"
 	deleteManyStmt = "DELETE FROM process_indicators WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

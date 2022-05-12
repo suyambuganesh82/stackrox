@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "reportconfigs"
 
-	deleteStmt  = "DELETE FROM reportconfigs WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM reportconfigs"
-	getManyStmt = "SELECT serialized FROM reportconfigs WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM reportconfigs WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM reportconfigs"
 	deleteManyStmt = "DELETE FROM reportconfigs WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

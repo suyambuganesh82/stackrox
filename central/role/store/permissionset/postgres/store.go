@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "permissionsets"
 
-	deleteStmt  = "DELETE FROM permissionsets WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM permissionsets"
-	getManyStmt = "SELECT serialized FROM permissionsets WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM permissionsets WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM permissionsets"
 	deleteManyStmt = "DELETE FROM permissionsets WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

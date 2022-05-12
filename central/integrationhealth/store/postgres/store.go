@@ -24,10 +24,8 @@ import (
 const (
 	baseTable = "integrationhealth"
 
-	deleteStmt  = "DELETE FROM integrationhealth WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM integrationhealth"
-	getManyStmt = "SELECT serialized FROM integrationhealth WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM integrationhealth WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM integrationhealth"
 	deleteManyStmt = "DELETE FROM integrationhealth WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

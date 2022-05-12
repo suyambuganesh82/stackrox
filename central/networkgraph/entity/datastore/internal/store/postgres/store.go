@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "networkentity"
 
-	deleteStmt  = "DELETE FROM networkentity WHERE Info_Id = $1"
-	walkStmt    = "SELECT serialized FROM networkentity"
-	getManyStmt = "SELECT serialized FROM networkentity WHERE Info_Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM networkentity WHERE Info_Id = $1"
+	walkStmt       = "SELECT serialized FROM networkentity"
 	deleteManyStmt = "DELETE FROM networkentity WHERE Info_Id = ANY($1::text[])"
 
 	batchAfter = 100

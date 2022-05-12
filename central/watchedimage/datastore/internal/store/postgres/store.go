@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "watchedimages"
 
-	deleteStmt  = "DELETE FROM watchedimages WHERE Name = $1"
-	walkStmt    = "SELECT serialized FROM watchedimages"
-	getManyStmt = "SELECT serialized FROM watchedimages WHERE Name = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM watchedimages WHERE Name = $1"
+	walkStmt       = "SELECT serialized FROM watchedimages"
 	deleteManyStmt = "DELETE FROM watchedimages WHERE Name = ANY($1::text[])"
 
 	batchAfter = 100

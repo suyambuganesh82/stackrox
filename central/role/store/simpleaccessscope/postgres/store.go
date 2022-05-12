@@ -25,10 +25,8 @@ import (
 const (
 	baseTable = "simpleaccessscopes"
 
-	deleteStmt  = "DELETE FROM simpleaccessscopes WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM simpleaccessscopes"
-	getManyStmt = "SELECT serialized FROM simpleaccessscopes WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM simpleaccessscopes WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM simpleaccessscopes"
 	deleteManyStmt = "DELETE FROM simpleaccessscopes WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

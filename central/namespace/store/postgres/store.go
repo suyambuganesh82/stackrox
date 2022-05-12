@@ -28,10 +28,8 @@ import (
 const (
 	baseTable = "namespaces"
 
-	deleteStmt  = "DELETE FROM namespaces WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM namespaces"
-	getManyStmt = "SELECT serialized FROM namespaces WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM namespaces WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM namespaces"
 	deleteManyStmt = "DELETE FROM namespaces WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

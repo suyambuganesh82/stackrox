@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "cluster_cves"
 
-	deleteStmt  = "DELETE FROM cluster_cves WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM cluster_cves"
-	getManyStmt = "SELECT serialized FROM cluster_cves WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM cluster_cves WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM cluster_cves"
 	deleteManyStmt = "DELETE FROM cluster_cves WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

@@ -28,10 +28,8 @@ import (
 const (
 	baseTable = "pods"
 
-	deleteStmt  = "DELETE FROM pods WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM pods"
-	getManyStmt = "SELECT serialized FROM pods WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM pods WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM pods"
 	deleteManyStmt = "DELETE FROM pods WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

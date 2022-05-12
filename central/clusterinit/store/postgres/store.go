@@ -24,10 +24,8 @@ import (
 const (
 	baseTable = "clusterinitbundles"
 
-	deleteStmt  = "DELETE FROM clusterinitbundles WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM clusterinitbundles"
-	getManyStmt = "SELECT serialized FROM clusterinitbundles WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM clusterinitbundles WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM clusterinitbundles"
 	deleteManyStmt = "DELETE FROM clusterinitbundles WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

@@ -28,10 +28,8 @@ import (
 const (
 	baseTable = "rolebindings"
 
-	deleteStmt  = "DELETE FROM rolebindings WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM rolebindings"
-	getManyStmt = "SELECT serialized FROM rolebindings WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM rolebindings WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM rolebindings"
 	deleteManyStmt = "DELETE FROM rolebindings WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100

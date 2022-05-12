@@ -23,10 +23,8 @@ import (
 const (
 	baseTable = "image_components"
 
-	deleteStmt  = "DELETE FROM image_components WHERE Id = $1"
-	walkStmt    = "SELECT serialized FROM image_components"
-	getManyStmt = "SELECT serialized FROM image_components WHERE Id = ANY($1::text[])"
-
+	deleteStmt     = "DELETE FROM image_components WHERE Id = $1"
+	walkStmt       = "SELECT serialized FROM image_components"
 	deleteManyStmt = "DELETE FROM image_components WHERE Id = ANY($1::text[])"
 
 	batchAfter = 100
