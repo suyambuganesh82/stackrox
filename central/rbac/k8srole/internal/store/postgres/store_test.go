@@ -272,6 +272,34 @@ func (s *K8srolesStoreSuite) TestSACGet() {
 	}
 }
 
+func (s *K8srolesStoreSuite) TestSACGetMany() {
+	objA := &storage.K8SRole{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.K8SRole{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*storage.K8SRole{
+		withAllAccess:           []*storage.K8SRole{objA, objB},
+		withNoAccess:            []*storage.K8SRole{},
+		withNoAccessToCluster:   []*storage.K8SRole{},
+		withAccessToDifferentNs: []*storage.K8SRole{},
+		withAccess:              []*storage.K8SRole{objA},
+		withAccessToCluster:     []*storage.K8SRole{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"

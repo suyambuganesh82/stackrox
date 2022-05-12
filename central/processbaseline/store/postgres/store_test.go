@@ -272,6 +272,34 @@ func (s *ProcessbaselinesStoreSuite) TestSACGet() {
 	}
 }
 
+func (s *ProcessbaselinesStoreSuite) TestSACGetMany() {
+	objA := &storage.ProcessBaseline{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.ProcessBaseline{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*storage.ProcessBaseline{
+		withAllAccess:           []*storage.ProcessBaseline{objA, objB},
+		withNoAccess:            []*storage.ProcessBaseline{},
+		withNoAccessToCluster:   []*storage.ProcessBaseline{},
+		withAccessToDifferentNs: []*storage.ProcessBaseline{},
+		withAccess:              []*storage.ProcessBaseline{objA},
+		withAccessToCluster:     []*storage.ProcessBaseline{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"

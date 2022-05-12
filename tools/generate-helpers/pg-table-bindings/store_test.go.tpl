@@ -306,6 +306,34 @@ func (s *{{$namePrefix}}StoreSuite) TestSACGet() {
 		})
 	}
 }
+
+func (s *{{$namePrefix}}StoreSuite) TestSACGetMany() {
+	objA := &{{.Type}}{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &{{.Type}}{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*{{ .Type }}{
+		withAllAccess:           []*{{ .Type }}{objA, objB},
+		withNoAccess:            []*{{ .Type }}{},
+		withNoAccessToCluster:   []*{{ .Type }}{},
+		withAccessToDifferentNs: []*{{ .Type }}{},
+		withAccess:              []*{{ .Type }}{objA},
+		withAccessToCluster:     []*{{ .Type }}{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
 {{- end }}
 
 const (

@@ -272,6 +272,34 @@ func (s *ProcessIndicatorsStoreSuite) TestSACGet() {
 	}
 }
 
+func (s *ProcessIndicatorsStoreSuite) TestSACGetMany() {
+	objA := &storage.ProcessIndicator{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.ProcessIndicator{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*storage.ProcessIndicator{
+		withAllAccess:           []*storage.ProcessIndicator{objA, objB},
+		withNoAccess:            []*storage.ProcessIndicator{},
+		withNoAccessToCluster:   []*storage.ProcessIndicator{},
+		withAccessToDifferentNs: []*storage.ProcessIndicator{},
+		withAccess:              []*storage.ProcessIndicator{objA},
+		withAccessToCluster:     []*storage.ProcessIndicator{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"

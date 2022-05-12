@@ -272,6 +272,34 @@ func (s *DeploymentsStoreSuite) TestSACGet() {
 	}
 }
 
+func (s *DeploymentsStoreSuite) TestSACGetMany() {
+	objA := &storage.Deployment{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.Deployment{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*storage.Deployment{
+		withAllAccess:           []*storage.Deployment{objA, objB},
+		withNoAccess:            []*storage.Deployment{},
+		withNoAccessToCluster:   []*storage.Deployment{},
+		withAccessToDifferentNs: []*storage.Deployment{},
+		withAccess:              []*storage.Deployment{objA},
+		withAccessToCluster:     []*storage.Deployment{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"

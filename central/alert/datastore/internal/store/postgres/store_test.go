@@ -272,6 +272,34 @@ func (s *AlertsStoreSuite) TestSACGet() {
 	}
 }
 
+func (s *AlertsStoreSuite) TestSACGetMany() {
+	objA := &storage.Alert{}
+	s.NoError(testutils.FullInit(objA, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	objB := &storage.Alert{}
+	s.NoError(testutils.FullInit(objB, testutils.UniqueInitializer(), testutils.JSONFieldsFilter))
+
+	withAllAccessCtx := sac.WithAllAccess(context.Background())
+	s.store.Upsert(withAllAccessCtx, objA)
+	s.store.Upsert(withAllAccessCtx, objB)
+
+	ctxs := getSACContexts(objA, storage.Access_READ_ACCESS)
+	for name, expected := range map[string][]*storage.Alert{
+		withAllAccess:           []*storage.Alert{objA, objB},
+		withNoAccess:            []*storage.Alert{},
+		withNoAccessToCluster:   []*storage.Alert{},
+		withAccessToDifferentNs: []*storage.Alert{},
+		withAccess:              []*storage.Alert{objA},
+		withAccessToCluster:     []*storage.Alert{objA},
+	} {
+		s.T().Run(fmt.Sprintf("with %s", name), func(t *testing.T) {
+			actual, _, err := s.store.GetMany(ctxs[name], []string{objA.GetId(), objB.GetId()})
+			s.NoError(err)
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
 const (
 	withAllAccess           = "AllAccess"
 	withNoAccess            = "NoAccess"
