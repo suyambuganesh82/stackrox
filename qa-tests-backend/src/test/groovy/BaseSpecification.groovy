@@ -283,7 +283,7 @@ class BaseSpecification extends Specification {
         try {
             orchestrator.cleanup()
         } catch (Exception e) {
-            log.error("Failed to clean up orchestrator", e)
+            println "Error to clean up orchestrator: ${e.message}"
             throw e
         }
         disableAuthzPlugin()
