@@ -41,7 +41,6 @@ func init() {
 			"suppressed: Boolean!",
 			"suppressActivation: Time",
 			"suppressExpiry: Time",
-			"activeState(query: String): ActiveState",
 			"vulnerabilityState: String!",
 			"unusedVarSink(query: String): Int",
 		}),
@@ -79,7 +78,6 @@ type NodeVulnerabilityResolver interface {
 	Suppressed(ctx context.Context) bool
 	SuppressActivation(ctx context.Context) (*graphql.Time, error)
 	SuppressExpiry(ctx context.Context) (*graphql.Time, error)
-	ActiveState(ctx context.Context, args RawQuery) (*activeStateResolver, error)
 	VulnerabilityState(ctx context.Context) string
 	UnusedVarSink(ctx context.Context, args RawQuery) *int32
 }
