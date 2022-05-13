@@ -1,21 +1,19 @@
 import static Services.getViolationsWithTimeout
-
+import groups.SensorBounce
 import io.stackrox.proto.storage.AlertOuterClass
-import services.AlertService
 import objects.Deployment
 import objects.NetworkPolicy
 import objects.NetworkPolicyTypes
+import org.junit.Assume
+import org.junit.experimental.categories.Category
+import services.AlertService
 import services.ClusterService
 import services.DevelopmentService
 import services.MetadataService
 import services.NamespaceService
 import services.NetworkPolicyService
 import services.SecretService
-
 import spock.lang.Retry
-import org.junit.Assume
-import org.junit.experimental.categories.Category
-import groups.SensorBounce
 import util.Timer
 
 @Retry(count = 0)
@@ -49,7 +47,7 @@ class ReconciliationTest extends BaseSpecification {
         "*central.SensorEvent_Secret": 5,
     ]
 
-    private static void verifyReconciliationStats(boolean verifyMin) {
+    private void verifyReconciliationStats(boolean verifyMin) {
         // Cannot verify this on a release build, since the API is not exposed.
         if (MetadataService.isReleaseBuild()) {
             return
@@ -62,7 +60,7 @@ class ReconciliationTest extends BaseSpecification {
             assert reconciliationStatsForCluster
             assert reconciliationStatsForCluster.getReconciliationDone()
         }
-        println "Reconciliation stats: ${reconciliationStatsForCluster.deletedObjectsByTypeMap}"
+        log.info "Reconciliation stats: ${reconciliationStatsForCluster.deletedObjectsByTypeMap}"
         for (def entry: reconciliationStatsForCluster.getDeletedObjectsByTypeMap().entrySet()) {
             def expectedMinDeletions = EXPECTED_MIN_DELETIONS_BY_KEY.get(entry.getKey())
             assert expectedMinDeletions != null : "Please add object type " +
@@ -175,7 +173,7 @@ class ReconciliationTest extends BaseSpecification {
             if (numDeployments + numPods + numNamespaces + numNetworkPolicies + numSecrets == 0) {
                 break
             }
-            println "Waiting for all resources to be reconciled"
+            log.info "Waiting for all resources to be reconciled"
         }
         assert numDeployments == 0
         assert numPods == 0
