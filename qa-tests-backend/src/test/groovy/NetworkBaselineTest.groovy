@@ -8,14 +8,12 @@ import util.NetworkGraphUtil
 
 import org.junit.experimental.categories.Category
 import spock.lang.Retry
-import util.Timer
-import spock.lang.Ignore
 
 @Retry(count = 0)
 class NetworkBaselineTest extends BaseSpecification {
     static final private String SERVER_DEP_NAME = "net-bl-server"
     static final private String BASELINED_CLIENT_DEP_NAME = "net-bl-client-baselined"
-    static final private String SERVER_USER_DEP_NAME = "net-bl-user-server"
+    static final private String USER_DEP_NAME = "net-bl-user-server"
     static final private String BASELINED_USER_CLIENT_DEP_NAME = "net-bl-user-client-baselined"
     static final private String ANOMALOUS_CLIENT_DEP_NAME = "net-bl-client-anomalous"
     static final private String DEFERRED_BASELINED_CLIENT_DEP_NAME = "net-bl-client-deferred-baselined"
@@ -46,10 +44,10 @@ class NetworkBaselineTest extends BaseSpecification {
                     ["for i in \$(seq 1 10); do wget -S http://${SERVER_DEP_NAME}; sleep 1; done; sleep 1000" as String]
                 )
 
-    static final private SERVER_USER_DEP = createAndRegisterDeployment()
-                    .setName(SERVER_USER_DEP_NAME)
+    static final private USER_DEP = createAndRegisterDeployment()
+                    .setName(USER_DEP_NAME)
                     .setImage(NGINX_IMAGE)
-                    .addLabel("app", SERVER_USER_DEP_NAME)
+                    .addLabel("app", USER_DEP_NAME)
                     .addPort(80)
                     .setExposeAsService(true)
 
@@ -59,7 +57,7 @@ class NetworkBaselineTest extends BaseSpecification {
                 .addLabel("app", BASELINED_USER_CLIENT_DEP_NAME)
                 .setCommand(["/bin/sh", "-c",])
                 .setArgs(
-                    ["for i in \$(seq 1 10); do wget -S http://${SERVER_USER_DEP_NAME}; sleep 1; done; sleep 1000" as String]
+                    ["for i in \$(seq 1 10); do wget -S http://${USER_DEP_NAME}; sleep 1; done; sleep 1000" as String]
                 )
 
     static final private ANOMALOUS_CLIENT_DEP = createAndRegisterDeployment()
@@ -161,7 +159,7 @@ class NetworkBaselineTest extends BaseSpecification {
         assert NetworkGraphUtil.checkForEdge(anomalousClientDeploymentID, serverDeploymentID, null,
             EXPECTED_BASELINE_DURATION_SECONDS + 180)
 
-        def serverBaseline = evaluateWithRetry(20, 3) {
+        def serverBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             if (baseline.getPeersCount() == 0) {
                 throw new RuntimeException(
@@ -199,12 +197,12 @@ class NetworkBaselineTest extends BaseSpecification {
         println "Deferred Baseline: ${deferredBaselinedClientDeploymentID}"
 
         // Waiting on it to come out of observation.
-        def deferredBaselinedClientBaseline = evaluateWithRetry(30, 3) {
+        def deferredBaselinedClientBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(deferredBaselinedClientDeploymentID)
             def now = System.currentTimeSeconds()
             if (baseline.getObservationPeriodEnd().getSeconds() > now) {
                 throw new RuntimeException(
-                    "Baseline ${deferredBaselinedClientDeploymentID} is not out of observation yet. Baseline is ${baseline}"
+                    "Baseline ${deferredBaselinedClientDeploymentID} is in observation. Baseline is ${baseline}"
                 )
             }
             return baseline
@@ -213,7 +211,7 @@ class NetworkBaselineTest extends BaseSpecification {
 
         assert NetworkGraphUtil.checkForEdge(deferredBaselinedClientDeploymentID, serverDeploymentID, null, 180)
         // Make sure peers have been added to the serverBaseline
-        serverBaseline = evaluateWithRetry(20, 3) {
+        serverBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             if (baseline.getPeersCount() < 2) {
                 throw new RuntimeException(
@@ -242,16 +240,14 @@ class NetworkBaselineTest extends BaseSpecification {
         "Create another deployment, ensure it DOES NOT get added to serverDeploymentID due to user lock"
         NetworkBaselineService.lockNetworkBaseline(serverDeploymentID)
 
-        def beforePostLockCreate = System.currentTimeSeconds()
         batchCreate([DEFERRED_POST_LOCK_CLIENT_DEP])
-        def justAfterPostLockCreate = System.currentTimeSeconds()
 
         def postLockClientDeploymentID = DEFERRED_POST_LOCK_CLIENT_DEP.deploymentUid
         assert postLockClientDeploymentID != null
         println "Post Lock Deployment: ${postLockClientDeploymentID}"
 
         // Waiting on it to come out of observation.
-        def postLockClientBaseline = evaluateWithRetry(30, 3) {
+        def postLockClientBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(postLockClientDeploymentID)
             def now = System.currentTimeSeconds()
             if (baseline.getObservationPeriodEnd().getSeconds() > now) {
@@ -264,7 +260,7 @@ class NetworkBaselineTest extends BaseSpecification {
         assert postLockClientBaseline
 
         assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)
-        serverBaseline = evaluateWithRetry(20, 3) {
+        serverBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             if (baseline.getPeersCount() > 2) {
                 throw new RuntimeException(
@@ -292,10 +288,10 @@ class NetworkBaselineTest extends BaseSpecification {
         when:
         "Create initial set of deployments, wait for baseline to populate"
         def beforeDeploymentCreate = System.currentTimeSeconds()
-        batchCreate([SERVER_USER_DEP, BASELINED_USER_CLIENT_DEP])
+        batchCreate([USER_DEP, BASELINED_USER_CLIENT_DEP])
         def justAfterDeploymentCreate = System.currentTimeSeconds()
 
-        def serverDeploymentID = SERVER_USER_DEP.deploymentUid
+        def serverDeploymentID = USER_DEP.deploymentUid
         assert serverDeploymentID != null
 
         def baselinedClientDeploymentID = BASELINED_USER_CLIENT_DEP.deploymentUid
@@ -314,7 +310,7 @@ class NetworkBaselineTest extends BaseSpecification {
         assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
 
         // Waiting on it to come out of observation.
-        serverBaseline = evaluateWithRetry(30, 3) {
+        serverBaseline = evaluateWithRetry(30, 4) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             def now = System.currentTimeSeconds()
             if (baseline.getPeersCount() == 0 && baseline.getObservationPeriodEnd().getSeconds() > now) {
