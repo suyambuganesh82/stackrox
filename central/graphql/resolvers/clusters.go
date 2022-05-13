@@ -84,6 +84,7 @@ func init() {
 		schema.AddExtraResolver("Cluster", `unusedVarSink(query: String): Int`),
 		schema.AddExtraResolver("Cluster", `istioEnabled: Boolean!`),
 		schema.AddExtraResolver("Cluster", "plottedVulns(query: String): PlottedVulnerabilities!"),
+		schema.AddExtraResolver("Cluster", "plottedNodeVulnerabilities(query: String): PlottedNodeVulnerabilities!"),
 		schema.AddExtraResolver("OrchestratorMetadata", `openshiftVersion: String!`),
 	)
 }
@@ -982,6 +983,17 @@ func (resolver *clusterResolver) LatestViolation(ctx context.Context, args RawQu
 func (resolver *clusterResolver) PlottedVulns(ctx context.Context, args RawQuery) (*PlottedVulnerabilitiesResolver, error) {
 	query := search.AddRawQueriesAsConjunction(args.String(), resolver.getClusterRawQuery())
 	return newPlottedVulnerabilitiesResolver(ctx, resolver.root, RawQuery{Query: &query})
+}
+
+func (resolver *clusterResolver) PlottedNodeVulnerabilities(ctx context.Context, args RawQuery) (*PlottedNodeVulnerabilitiesResolver, error) {
+	defer metrics.SetGraphQLOperationDurationTime(time.Now(), pkgMetrics.Cluster, "PlottedNodeVulnerabilities")
+
+	if !features.PostgresDatastore.Enabled() {
+		query := search.AddRawQueriesAsConjunction(args.String(), resolver.getClusterRawQuery())
+		return newPlottedNodeVulnerabilitiesResolver(ctx, resolver.root, RawQuery{Query: &query})
+	}
+	// TODO : Add postgres support
+	return nil, errors.New("Sub-resolver PlottedNodeVulnerabilities in clusterResolver does not support postgres yet")
 }
 
 func (resolver *clusterResolver) UnusedVarSink(ctx context.Context, args RawQuery) *int32 {
