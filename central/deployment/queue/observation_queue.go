@@ -133,7 +133,7 @@ func (q *deploymentObservationQueueImpl) removeListItem(deploymentID string) {
 	}
 }
 
-// RemoveDeployment removes a deployment from the list and the map
+// removeDeployment removes a deployment from the list and the map
 func (q *deploymentObservationQueueImpl) removeDeployment(deploymentID string) {
 	// remove the corresponding list items
 	q.removeListItem(deploymentID)
