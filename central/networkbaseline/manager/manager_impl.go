@@ -98,10 +98,6 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 			return false
 		}
 
-		log.Infof("SHREWS -- shouldUpdate -- deployment %s", baseline.baselineInfo.DeploymentName)
-		log.Infof("SHREWS observation end %s", baseline.baselineInfo.ObservationPeriodEnd)
-		log.Infof("SHREWS -- updateTS -- %s", updateTS)
-
 		// It is possible that the last time stamp on the flow is nil if the connection is initial and still open
 		// In those cases updateTS will be 0 because that is the nil value of a MicroTS.  So all flows in such a state
 		// would think the baseline is out of observation or not when we compare the time as we do below.  To resolve
@@ -121,7 +117,6 @@ func (m *manager) shouldUpdate(conn *networkgraph.NetworkConnIndicator, updateTS
 		if baseline.baselineInfo.ObservationPeriodEnd.After(compareTime) || initialLoad {
 			atLeastOneBaselineInObservationPeriod = true
 		}
-		log.Infof("SHREWS -- %t", atLeastOneBaselineInObservationPeriod)
 	}
 	return atLeastOneBaselineInObservationPeriod
 }
@@ -754,9 +749,6 @@ func (m *manager) flushBaselineQueue() {
 		// NOTE:  This is the only place from which Pull is being called.
 		deployment := m.deploymentObservationQueue.Pull()
 
-		log.Infof("SHREWS -- flush -- deployment %s", deployment.DeploymentName)
-		log.Infof("SHREWS observation end %s", timestamp.FromProtobuf(deployment.ObservationEnd))
-
 		_ = m.addBaseline(deployment.DeploymentID, deployment.DeploymentName, deployment.ClusterID, deployment.Namespace, timestamp.FromProtobuf(deployment.ObservationEnd))
 	}
 }
@@ -780,7 +772,6 @@ func (m *manager) getFlowStore(ctx context.Context, clusterID string) (networkFl
 }
 
 func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace string, observationEnd timestamp.MicroTS) error {
-	log.Infof("SHREWS -- addBaseline - %s %s", deploymentID, deploymentName)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -816,7 +807,6 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 
 	// If we have flows then process them.  If we don't persist an empty baseline
 	if len(flows) > 0 {
-		log.Info("SHREWS -- we got some flows -- %s", deploymentName)
 		// package them into a map of flows like comes in
 		// when packaging the flows up in that map, I think the timestamp has to be now
 		flowMap := m.putFlowsInMap(flows)
@@ -831,14 +821,12 @@ func (m *manager) addBaseline(deploymentID, deploymentName, clusterID, namespace
 		// need to persist an empty baseline object for this deployment.  As subsequent deployments are processed,
 		// flows will be added.
 		if modifiedDeployments.Contains(deploymentID) {
-			log.Info("SHREWS -- No need to write empty")
 			writeEmpty = false
 		}
 	}
 
 	// If there are no flows OR the peers were all locked, we need to write an empty baseline.
 	if writeEmpty {
-		log.Info("SHREWS -- writing empty")
 		// Save the empty baseline because we may not be able to update it if all its connections are locked.
 		err := m.persistNetworkBaselines(set.NewStringSet(deploymentID), nil)
 		if err != nil {
@@ -880,7 +868,6 @@ func (m *manager) CreateNetworkBaseline(deploymentID string) error {
 }
 
 func (m *manager) putFlowsInMap(newFlows []*storage.NetworkFlow) map[networkgraph.NetworkConnIndicator]timestamp.MicroTS {
-	log.Infof("SHREWS -- putFlowsInMap -- %s", newFlows)
 	out := make(map[networkgraph.NetworkConnIndicator]timestamp.MicroTS, len(newFlows))
 	now := timestamp.Now()
 	for _, newFlow := range newFlows {

@@ -338,28 +338,22 @@ func (suite *ManagerTestSuite) TestFlowsUpdate() {
 func (suite *ManagerTestSuite) TestRepeatedCreates() {
 	suite.mustInitManager()
 
-	log.Info("1")
 	suite.initBaselinesForDeployments(1, 2, 3)
 	suite.assertBaselinesAre(emptyBaseline(1), emptyBaseline(2), emptyBaseline(3))
-	log.Info("2")
 	suite.initBaselinesForDeployments(1) // Should be a no-op
 	suite.assertBaselinesAre(emptyBaseline(1), emptyBaseline(2), emptyBaseline(3))
-	log.Info("3")
 	suite.processFlowUpdate(conns(depToDepConn(1, 2, 52)), conns(depToDepConn(2, 3, 51)))
 	suite.assertBaselinesAre(
 		baselineWithPeers(1, depPeer(2, properties(false, 52))),
 		baselineWithPeers(2, depPeer(1, properties(true, 52))),
 		emptyBaseline(3),
 	)
-	log.Info("4")
 	suite.initBaselinesForDeployments(1) // Should be a no-op
 	suite.assertBaselinesAre(
 		baselineWithPeers(1, depPeer(2, properties(false, 52))),
 		baselineWithPeers(2, depPeer(1, properties(true, 52))),
 		emptyBaseline(3),
 	)
-	log.Info("5")
-
 }
 
 func (suite *ManagerTestSuite) TestResilienceToRestarts() {

@@ -197,12 +197,22 @@ class NetworkBaselineTest extends BaseSpecification {
         def deferredBaselinedClientDeploymentID = DEFERRED_BASELINED_CLIENT_DEP.deploymentUid
         assert deferredBaselinedClientDeploymentID != null
         println "Deferred Baseline: ${deferredBaselinedClientDeploymentID}"
-        // Need to chill out until the observation period ends
 
-        sleep 90000
-        println "Back from a nap"
+        // Waiting on it to come out of observation.
+        def deferredBaselinedClientBaseline = evaluateWithRetry(30, 3) {
+            def baseline = NetworkBaselineService.getNetworkBaseline(deferredBaselinedClientDeploymentID)
+            def now = System.currentTimeSeconds()
+            if (baseline.getObservationPeriodEnd().getSeconds() > now) {
+                throw new RuntimeException(
+                    "Baseline ${deferredBaselinedClientDeploymentID} is not out of observation yet. Baseline is ${baseline}"
+                )
+            }
+            return baseline
+        }
+        assert deferredBaselinedClientBaseline
 
         assert NetworkGraphUtil.checkForEdge(deferredBaselinedClientDeploymentID, serverDeploymentID, null, 180)
+        // Make sure peers have been added to the serverBaseline
         serverBaseline = evaluateWithRetry(20, 3) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
             if (baseline.getPeersCount() < 2) {
@@ -213,11 +223,6 @@ class NetworkBaselineTest extends BaseSpecification {
             return baseline
         }
         assert serverBaseline
-
-        def deferredBaselinedClientBaseline = NetworkBaselineService.getNetworkBaseline(
-            deferredBaselinedClientDeploymentID
-        )
-        assert deferredBaselinedClientDeploymentID
 
         then:
         "Validate the updated baselines"
@@ -244,10 +249,19 @@ class NetworkBaselineTest extends BaseSpecification {
         def postLockClientDeploymentID = DEFERRED_POST_LOCK_CLIENT_DEP.deploymentUid
         assert postLockClientDeploymentID != null
         println "Post Lock Deployment: ${postLockClientDeploymentID}"
-        // Need to chill out until the observation period ends
 
-        sleep 90000
-        println "Back from a nap"
+        // Waiting on it to come out of observation.
+        def postLockClientBaseline = evaluateWithRetry(30, 3) {
+            def baseline = NetworkBaselineService.getNetworkBaseline(postLockClientDeploymentID)
+            def now = System.currentTimeSeconds()
+            if (baseline.getObservationPeriodEnd().getSeconds() > now) {
+                throw new RuntimeException(
+                    "Baseline ${postLockClientDeploymentID} is not out of observation yet. Baseline is ${baseline}"
+                )
+            }
+            return baseline
+        }
+        assert postLockClientBaseline
 
         assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)
         serverBaseline = evaluateWithRetry(20, 3) {
@@ -260,14 +274,6 @@ class NetworkBaselineTest extends BaseSpecification {
             return baseline
         }
         assert serverBaseline
-
-        print "About to do a get"
-        def postLockClientBaseline = NetworkBaselineService.getNetworkBaseline(
-            postLockClientDeploymentID
-        )
-        print "back from get, hopefully we didn't delete crap already"
-        assert postLockClientBaseline
-        print postLockClientBaseline
 
         then:
         "Validate the locked baselines"
@@ -307,7 +313,6 @@ class NetworkBaselineTest extends BaseSpecification {
 
         assert NetworkGraphUtil.checkForEdge(baselinedClientDeploymentID, serverDeploymentID, null, 180)
 
-//         sleep 60000
         // Waiting on it to come out of observation.
         serverBaseline = evaluateWithRetry(30, 3) {
             def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
