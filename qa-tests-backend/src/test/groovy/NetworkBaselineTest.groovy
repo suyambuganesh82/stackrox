@@ -262,15 +262,9 @@ class NetworkBaselineTest extends BaseSpecification {
         assert postLockClientBaseline
 
         assert NetworkGraphUtil.checkForEdge(postLockClientDeploymentID, serverDeploymentID, null, 180)
-        serverBaseline = evaluateWithRetry(30, 4) {
-            def baseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
-            if (baseline.getPeersCount() > 2) {
-                throw new RuntimeException(
-                    "Too many peers for ${serverDeploymentID} due to lock. Baseline is ${baseline}"
-                )
-            }
-            return baseline
-        }
+
+        // Grab the latest server baseline for validation
+        serverBaseline = NetworkBaselineService.getNetworkBaseline(serverDeploymentID)
         assert serverBaseline
 
         then:
@@ -328,7 +322,8 @@ class NetworkBaselineTest extends BaseSpecification {
 
         then:
         "Validate user requested server baseline"
-        // The client->server connection should be baselined since the client.
+        // The client->server connection should be baselined since the client as the
+        // connection occurred during the observation window.
         validateBaseline(serverBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
             [new Tuple2<String, Boolean>(baselinedClientDeploymentID, true)])
         validateBaseline(baselinedClientBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
