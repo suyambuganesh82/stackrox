@@ -8,6 +8,7 @@ import util.NetworkGraphUtil
 
 import org.junit.experimental.categories.Category
 import spock.lang.Retry
+import spock.lang.Unroll
 
 @Retry(count = 0)
 class NetworkBaselineTest extends BaseSpecification {
@@ -131,6 +132,7 @@ class NetworkBaselineTest extends BaseSpecification {
         }
     }
 
+    @Unroll
     @Category(NetworkBaseline)
     def "Verify network baseline functionality"() {
         when:
@@ -283,6 +285,7 @@ class NetworkBaselineTest extends BaseSpecification {
             [])
     }
 
+    @Unroll
     @Category(NetworkBaseline)
     def "Verify user get for non-existent baseline"() {
         when:
@@ -325,8 +328,7 @@ class NetworkBaselineTest extends BaseSpecification {
 
         then:
         "Validate user requested server baseline"
-        // The anomalous client->server connection should not be baselined since the anonymous client
-        // sleeps for a time period longer than the observation period before connecting to the server.
+        // The client->server connection should be baselined since the client.
         validateBaseline(serverBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
             [new Tuple2<String, Boolean>(baselinedClientDeploymentID, true)])
         validateBaseline(baselinedClientBaseline, beforeDeploymentCreate, justAfterDeploymentCreate,
