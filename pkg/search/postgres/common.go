@@ -519,3 +519,19 @@ func RunCountRequestForSchema(schema *walker.Schema, q *v1.Query, db *pgxpool.Po
 	}
 	return count, nil
 }
+
+// RunDeleteRequestForSchema executes a request for just the delete against the database
+func RunDeleteRequestForSchema(schema *walker.Schema, q *v1.Query, db *pgxpool.Pool) error {
+	query, err := standardizeQueryAndPopulatePath(q, schema, DELETE)
+	if err != nil || query == nil {
+		return err
+	}
+
+	queryStr := query.String()
+	rows, err := db.Query(context.Background(), replaceVars(queryStr), query.Data...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return nil
+}
