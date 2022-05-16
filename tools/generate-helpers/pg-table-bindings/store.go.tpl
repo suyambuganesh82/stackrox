@@ -52,7 +52,6 @@ const (
 
         getStmt = "SELECT serialized FROM {{.Table}} WHERE {{template "whereMatch" $pks}}"
         deleteStmt = "DELETE FROM {{.Table}} WHERE {{template "whereMatch" $pks}}"
-        walkStmt = "SELECT serialized FROM {{.Table}}"
 
 {{- if $singlePK }}
         getManyStmt = "SELECT serialized FROM {{.Table}} WHERE {{$singlePK.ColumnName}} = ANY($1::text[])"
@@ -233,10 +232,9 @@ func (s *storeImpl) {{ template "copyFunctionName" $schema }}(ctx context.Contex
         // Add the id to be deleted.
         deletes = append(deletes, {{ range $field := $schema.PrimaryKeys }}{{$field.Getter "obj"}}, {{end}})
         {{else}}
-        if _, err := tx.Exec(ctx, deleteStmt, {{ range $field := $schema.PrimaryKeys }}{{$field.Getter "obj"}}, {{end}}); err != nil {
+        if err := s.Delete(ctx, {{ range $field := $schema.PrimaryKeys }}{{$field.Getter "obj"}}, {{end}}); err != nil {
             return err
         }
-
         {{end}}
         {{end}}
 
@@ -245,8 +243,7 @@ func (s *storeImpl) {{ template "copyFunctionName" $schema }}(ctx context.Contex
             // copy does not upsert so have to delete first.  parent deletion cascades so only need to
             // delete for the top level parent
             {{if and ((eq (len $schema.PrimaryKeys) 1)) (not $schema.Parent) }}
-            _, err = tx.Exec(ctx, deleteManyStmt, deletes);
-            if err != nil {
+            if err := s.DeleteMany(ctx, deletes); err != nil {
                 return err
             }
             // clear the inserts and vals for the next batch
@@ -741,9 +738,39 @@ func (s *storeImpl) DeleteMany(ctx context.Context, ids []{{$singlePK.Type}}) er
 
 // Walk iterates over all of the objects in the store and applies the closure
 func (s *storeImpl) Walk(ctx context.Context, fn func(obj *{{.Type}}) error) error {
-	rows, err := s.db.Query(ctx, walkStmt)
+    var sacQueryFilter *v1.Query
+{{- if .PermissionChecker }}
+    if ok, err := {{ .PermissionChecker }}.WalkAllowed(ctx); err != nil || !ok {
+        return err
+    }
+{{- else if .Obj.IsGloballyScoped }}
+    {{ template "defineScopeChecker" "READ" }}
+    if ok, err := scopeChecker.Allowed(ctx); err != nil {
+        return err
+    } else if !ok {
+        return nil
+    }
+{{- else if .Obj.IsDirectlyScoped }}
+    scopeChecker := sac.GlobalAccessScopeChecker(ctx)
+    scopeTree, err := scopeChecker.EffectiveAccessScope(permissions.ResourceWithAccess{
+        Resource: targetResource,
+        Access:   storage.Access_READ_ACCESS,
+    })
+    if err != nil {
+        return err
+    }
+    {{- if .Obj.IsClusterScope }}
+    sacQueryFilter, err = sac.BuildClusterLevelSACQueryFilter(scopeTree)
+    {{- else}}
+    sacQueryFilter, err = sac.BuildClusterNamespaceLevelSACQueryFilter(scopeTree)
+    {{- end }}
+    if err != nil {
+        return err
+    }
+{{- end }}
+    rows, err := postgres.RunGetManyQueryForSchema(ctx, schema, sacQueryFilter, s.db)
 	if err != nil {
-		return pgutils.ErrNilIfNoRows(err)
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {

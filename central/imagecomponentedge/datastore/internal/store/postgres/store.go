@@ -26,7 +26,6 @@ const (
 
 	getStmt     = "SELECT serialized FROM image_component_relations WHERE Id = $1 AND ImageId = $2 AND ImageComponentId = $3"
 	deleteStmt  = "DELETE FROM image_component_relations WHERE Id = $1 AND ImageId = $2 AND ImageComponentId = $3"
-	walkStmt    = "SELECT serialized FROM image_component_relations"
 	getManyStmt = "SELECT serialized FROM image_component_relations WHERE Id = ANY($1::text[])"
 
 	deleteManyStmt = "DELETE FROM image_component_relations WHERE Id = ANY($1::text[])"
@@ -193,9 +192,10 @@ func (s *storeImpl) GetMany(ctx context.Context, ids []string) ([]*storage.Image
 
 // Walk iterates over all of the objects in the store and applies the closure
 func (s *storeImpl) Walk(ctx context.Context, fn func(obj *storage.ImageComponentEdge) error) error {
-	rows, err := s.db.Query(ctx, walkStmt)
+	var sacQueryFilter *v1.Query
+	rows, err := postgres.RunGetManyQueryForSchema(ctx, schema, sacQueryFilter, s.db)
 	if err != nil {
-		return pgutils.ErrNilIfNoRows(err)
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {

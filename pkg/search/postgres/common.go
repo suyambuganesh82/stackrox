@@ -6,9 +6,11 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	v1 "github.com/stackrox/rox/generated/api/v1"
+	"github.com/stackrox/rox/pkg/errox"
 	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/pointers"
 	"github.com/stackrox/rox/pkg/postgres/walker"
@@ -28,7 +30,8 @@ type QueryType int
 
 // These are the currently supported query types
 const (
-	GET QueryType = iota
+	SEARCH QueryType = iota
+	GET
 	COUNT
 	DELETE
 )
@@ -114,6 +117,11 @@ func generateSelectFields(entry *pgsearch.QueryEntry, primaryKeys []walker.Field
 
 	if selectType == COUNT {
 		sel.Query = "select count(*)"
+		return sel
+	}
+
+	if selectType == GET {
+		sel.Query = "select serialized"
 		return sel
 	}
 	var pathsInSelectClause []string
@@ -439,7 +447,7 @@ func RunSearchRequestForSchema(schema *walker.Schema, q *v1.Query, db *pgxpool.P
 		}
 	}()
 
-	query, err = standardizeQueryAndPopulatePath(q, schema, GET)
+	query, err = standardizeQueryAndPopulatePath(q, schema, SEARCH)
 	if err != nil {
 		return nil, err
 	}
@@ -518,4 +526,52 @@ func RunCountRequestForSchema(schema *walker.Schema, q *v1.Query, db *pgxpool.Po
 		return 0, err
 	}
 	return count, nil
+}
+
+// RunDeleteRequestForSchema executes a request for just the delete against the database
+func RunDeleteRequestForSchema(schema *walker.Schema, q *v1.Query, db *pgxpool.Pool) error {
+	query, err := standardizeQueryAndPopulatePath(q, schema, DELETE)
+	if err != nil || query == nil {
+		return err
+	}
+
+	queryStr := query.String()
+	rows, err := db.Query(context.Background(), replaceVars(queryStr), query.Data...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return nil
+}
+
+// RunGetQueryForSchema executes a request for just the search against the database
+func RunGetQueryForSchema(ctx context.Context, schema *walker.Schema, q *v1.Query, db *pgxpool.Pool) ([]byte, error) {
+	query, err := standardizeQueryAndPopulatePath(q, schema, GET)
+	if err != nil {
+		return nil, err
+	}
+	if query == nil {
+		return nil, errox.InvalidArgs.New("empty query")
+	}
+
+	queryStr := query.String()
+	row := db.QueryRow(ctx, replaceVars(queryStr), query.Data...)
+
+	var data []byte
+	err = row.Scan(&data)
+	return data, err
+}
+
+// RunGetManyQueryForSchema executes a request for just the search against the database
+func RunGetManyQueryForSchema(ctx context.Context, schema *walker.Schema, q *v1.Query, db *pgxpool.Pool) (pgx.Rows, error) {
+	query, err := standardizeQueryAndPopulatePath(q, schema, GET)
+	if err != nil {
+		return nil, err
+	}
+	if query == nil {
+		return nil, errox.InvalidArgs.New("empty query")
+	}
+
+	queryStr := query.String()
+	return db.Query(ctx, replaceVars(queryStr), query.Data...)
 }

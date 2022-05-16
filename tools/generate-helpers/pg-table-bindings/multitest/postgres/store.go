@@ -26,7 +26,6 @@ const (
 
 	getStmt     = "SELECT serialized FROM multikey WHERE Key1 = $1 AND Key2 = $2"
 	deleteStmt  = "DELETE FROM multikey WHERE Key1 = $1 AND Key2 = $2"
-	walkStmt    = "SELECT serialized FROM multikey"
 	getManyStmt = "SELECT serialized FROM multikey WHERE Key1 = ANY($1::text[])"
 
 	deleteManyStmt = "DELETE FROM multikey WHERE Key1 = ANY($1::text[])"
@@ -227,7 +226,7 @@ func (s *storeImpl) copyFromMultikey(ctx context.Context, tx pgx.Tx, objs ...*st
 			serialized,
 		})
 
-		if _, err := tx.Exec(ctx, deleteStmt, obj.GetKey1(), obj.GetKey2()); err != nil {
+		if err := s.Delete(ctx, obj.GetKey1(), obj.GetKey2()); err != nil {
 			return err
 		}
 
@@ -547,9 +546,10 @@ func (s *storeImpl) DeleteMany(ctx context.Context, ids []string) error {
 
 // Walk iterates over all of the objects in the store and applies the closure
 func (s *storeImpl) Walk(ctx context.Context, fn func(obj *storage.TestMultiKeyStruct) error) error {
-	rows, err := s.db.Query(ctx, walkStmt)
+	var sacQueryFilter *v1.Query
+	rows, err := postgres.RunGetManyQueryForSchema(ctx, schema, sacQueryFilter, s.db)
 	if err != nil {
-		return pgutils.ErrNilIfNoRows(err)
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {

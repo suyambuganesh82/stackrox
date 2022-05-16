@@ -60,7 +60,12 @@ func New(store store.Store, graphProvider graph.Provider, indexer index.Indexer,
 	} else {
 		ds.formattedSearcher = formatSearcher(indexer, graphProvider, namespaceRanker)
 	}
-	if err := ds.buildIndex(context.TODO()); err != nil {
+	ctx := sac.WithGlobalAccessScopeChecker(context.Background(),
+		sac.AllowFixedScopes(
+			sac.AccessModeScopeKeys(storage.Access_READ_ACCESS),
+			sac.ResourceScopeKeys(resources.Namespace),
+		))
+	if err := ds.buildIndex(ctx); err != nil {
 		return nil, err
 	}
 	return ds, nil
