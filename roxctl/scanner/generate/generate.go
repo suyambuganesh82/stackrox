@@ -109,7 +109,7 @@ func Command(cliEnvironment environment.Environment) *cobra.Command {
 		fmt.Sprintf(
 			"Generate deployment files supporting the given Istio version. Valid versions: %s",
 			strings.Join(istioutils.ListKnownIstioVersions(), ", ")))
-	c.PersistentFlags().BoolVar(&scannerGenerateCmd.enableDeprecatedPodSecurityPolicies, "enable-deprecated-pod-security-policies", true, "Generate deprecated PodSecurityPolicy resources")
+	c.PersistentFlags().BoolVar(&scannerGenerateCmd.enableDeprecatedPodSecurityPolicies, "enable-deprecated-pod-security-policies", false, "Generate deprecated PodSecurityPolicy resources")
 
 	return c
 }

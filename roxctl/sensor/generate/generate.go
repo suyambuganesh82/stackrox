@@ -228,7 +228,7 @@ func Command(cliEnvironment environment.Environment) *cobra.Command {
 
 	c.PersistentFlags().BoolVar(&generateCmd.cluster.AdmissionController, "admission-controller-listen-on-creates", false, "whether or not to configure the admission controller webhook to listen on deployment creates")
 	c.PersistentFlags().BoolVar(&generateCmd.cluster.AdmissionControllerUpdates, "admission-controller-listen-on-updates", false, "whether or not to configure the admission controller webhook to listen on deployment updates")
-	c.PersistentFlags().BoolVar(&generateCmd.enableDeprecatedPodSecurityPolicies, "enable-deprecated-pod-security-policies", true, "Generate deprecated PodSecurityPolicy resources")
+	c.PersistentFlags().BoolVar(&generateCmd.enableDeprecatedPodSecurityPolicies, "enable-deprecated-pod-security-policies", false, "Generate deprecated PodSecurityPolicy resources")
 
 	// Admission controller config
 	ac := generateCmd.cluster.DynamicConfig.AdmissionControllerConfig

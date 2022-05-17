@@ -2519,7 +2519,7 @@ jobs:
       - LOCAL_PORT: 8000
       - COLLECTION_METHOD: ebpf
       - GCP_IMAGE_TYPE: "COS"
-      - POD_SECURITY_POLICIES: "true"
+      - POD_SECURITY_POLICIES: "false"
       - MONITORING_SUPPORT: false
       - SCANNER_SUPPORT: true
       - ROX_BASELINE_GENERATION_DURATION: 1m
@@ -2936,7 +2936,7 @@ jobs:
     resource_class: small
     environment:
       - GCP_IMAGE_TYPE: "COS"
-      - POD_SECURITY_POLICIES: "true"
+      - POD_SECURITY_POLICIES: "false"
     steps:
       - checkout
       - check-backend-changes
@@ -2946,12 +2946,12 @@ jobs:
       - provision-gke-cluster:
           cluster-id: api-e2e-tests
 
-  provision-gke-api-e2e-tests-no-psps:
+  provision-gke-api-e2e-tests-with-psps:
     executor: custom
     resource_class: small
     environment:
       - GCP_IMAGE_TYPE: "COS"
-      - POD_SECURITY_POLICIES: "false"
+      - POD_SECURITY_POLICIES: "true"
     steps:
       - checkout
       - check-backend-changes
@@ -2959,14 +2959,14 @@ jobs:
           label: ci-no-qa-tests
 
       - provision-gke-cluster:
-          cluster-id: api-e2e-tests-no-psps
+          cluster-id: api-e2e-tests-with-psps
 
   provision-gke-postgres-api-e2e-tests:
     executor: custom
     resource_class: small
     environment:
       - GCP_IMAGE_TYPE: "COS"
-      - POD_SECURITY_POLICIES: "true"
+      - POD_SECURITY_POLICIES: "false"
     steps:
       - checkout
       - check-backend-changes
@@ -3345,7 +3345,7 @@ jobs:
     resource_class: small
     environment:
       GCP_IMAGE_TYPE: "COS"
-      POD_SECURITY_POLICIES: "true"
+      POD_SECURITY_POLICIES: "false"
     steps:
       - checkout
       - check-backend-changes
@@ -3626,7 +3626,7 @@ jobs:
             - check-label-to-skip-tests:
                 label: ci-no-qa-tests
 
-  gke-api-e2e-tests-no-psps:
+  gke-api-e2e-tests-with-psps:
     executor: custom
     environment:
       - LOCAL_PORT: 443
@@ -3640,17 +3640,17 @@ jobs:
       - ADMISSION_CONTROLLER_UPDATES: true
       - ROX_NETWORK_BASELINE_OBSERVATION_PERIOD: 2m
       - ROX_NEW_POLICY_CATEGORIES: true
-      - POD_SECURITY_POLICIES: false
+      - POD_SECURITY_POLICIES: true
 
     steps:
       - run-qa-tests:
-          cluster-id: api-e2e-tests-no-psps
+          cluster-id: api-e2e-tests-with-psps
           sensor-deploy-flavor: helm
           determine-whether-to-run:
             - check-label-to-skip-tests:
                 label: ci-no-qa-tests
       - run-qa-tests:
-          cluster-id: api-e2e-tests-no-psps
+          cluster-id: api-e2e-tests-with-psps
           sensor-deploy-flavor: kubectl
           determine-whether-to-run:
             - check-label-to-skip-tests:
@@ -4889,15 +4889,15 @@ workflows:
             - build-rhacs
             - build-scale-monitoring-and-mock-server
             - provision-gke-api-e2e-tests
-      - provision-gke-api-e2e-tests-no-psps:
+      - provision-gke-api-e2e-tests-with-psps:
           <<: *runOnAllTagsWithQuayIOPullCtx
-      - gke-api-e2e-tests-no-psps:
+      - gke-api-e2e-tests-with-psps:
           <<: *runOnAllTagsWithQuayIOPullCtx
           requires:
             - build-stackrox
             - build-rhacs
             - build-scale-monitoring-and-mock-server
-            - provision-gke-api-e2e-tests-no-psps
+            - provision-gke-api-e2e-tests-with-psps
       - provision-gke-postgres-api-e2e-tests:
           <<: *runOnAllTagsWithQuayIOPullCtx
       - gke-postgres-api-e2e-tests:
