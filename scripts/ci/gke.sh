@@ -125,7 +125,7 @@ create_cluster() {
     if [[ "${POD_SECURITY_POLICIES}" == "true" ]]; then
         PSP_ARG="--enable-pod-security-policy"
     fi
-    zones=$(gcloud compute zones list --filter="region=$REGION" | grep UP | cut -f1 -d' ')
+    zones=$(gcloud broken zones list --filter="region=$REGION" | grep UP | cut -f1 -d' ')
     success=0
     for zone in $zones; do
         if is_CIRCLECI; then
