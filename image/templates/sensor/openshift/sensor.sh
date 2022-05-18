@@ -84,11 +84,11 @@ echo "Creating admission controller RBAC roles..."
 ${KUBE_COMMAND} apply -f "$DIR/admission-controller-rbac.yaml"
 echo "Creating admission controller network policies..."
 ${KUBE_COMMAND} apply -f "$DIR/admission-controller-netpol.yaml"
-echo "Creating admission controller pod security policies..."
 if [[ -f "$DIR/admission-controller-pod-security.yaml" ]]; then
+  echo "Creating admission controller pod security policies..."
   ${KUBE_COMMAND} apply -f "$DIR/admission-controller-pod-security.yaml"
-  echo "Creating admission controller deployment..."
 fi
+echo "Creating admission controller deployment..."
 ${KUBE_COMMAND} apply -f "$DIR/admission-controller.yaml"
 
 echo "Creating collector security context constraints..."
