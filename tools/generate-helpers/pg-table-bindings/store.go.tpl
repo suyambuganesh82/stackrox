@@ -105,6 +105,10 @@ type Store interface {
 
 type storeImpl struct {
     db *pgxpool.Pool
+
+    // Lock since copyFrom requires a delete first before being executed we can get in odd states if
+    // multiple processes are trying to work on the same subsets of rows.
+    mutex sync.Mutex
 }
 
 {{ define "defineScopeChecker" }}scopeChecker := sac.GlobalAccessScopeChecker(ctx).AccessMode(storage.Access_{{ . }}_ACCESS).Resource(targetResource){{ end }}
@@ -362,6 +366,9 @@ func (s *storeImpl) Upsert(ctx context.Context, obj *{{.Type}}) error {
     }
     {{- end }}
 
+    s.mutex.Lock()
+    defer s.mutex.Unlock()
+
     return s.upsert(ctx, obj)
 }
 
@@ -404,6 +411,9 @@ func (s *storeImpl) UpsertMany(ctx context.Context, objs []*{{.Type}}) error {
         }
     }
     {{- end }}
+
+    s.mutex.Lock()
+    defer s.mutex.Unlock()
 
     if len(objs) < batchAfter {
         return s.upsert(ctx, objs...)

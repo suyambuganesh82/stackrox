@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -68,6 +69,10 @@ type Store interface {
 
 type storeImpl struct {
 	db *pgxpool.Pool
+
+	// Lock since copyFrom requires a delete first before being executed we can get in odd states if
+	// multiple processes are trying to work on the same subsets of rows.
+	mutex sync.Mutex
 }
 
 // New returns a new Store instance using the provided sql instance.
@@ -259,6 +264,9 @@ func (s *storeImpl) Upsert(ctx context.Context, obj *storage.K8SRole) error {
 		return sac.ErrResourceAccessDenied
 	}
 
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	return s.upsert(ctx, obj)
 }
 
@@ -282,6 +290,9 @@ func (s *storeImpl) UpsertMany(ctx context.Context, objs []*storage.K8SRole) err
 			return errors.Wrapf(sac.ErrResourceAccessDenied, "modifying k8SRoles with IDs [%s] was denied", strings.Join(deniedIds, ", "))
 		}
 	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	if len(objs) < batchAfter {
 		return s.upsert(ctx, objs...)
