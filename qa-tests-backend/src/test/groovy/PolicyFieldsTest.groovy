@@ -957,7 +957,7 @@ class PolicyFieldsTest extends BaseSpecification {
         "Required Image Label"            | REQUIRED_IMAGE_LABEL_NO_MATCH_II     | WITH_IMAGE_LABELS                       | "no match II"
         "Required Label"                  | REQUIRED_LABEL_KEY_AND_VALUE         | WITH_KEY_ONLY_LABEL                     | "no key only when value required"
         "Required Label"                  | REQUIRED_LABEL_KEY_AND_VALUE         | WITH_MISMATCHED_LABELS                  | "both required"
-        "Severity"                        | EXCLUDE_SEVERITY_GT_IMPORTANT        | WITH_SEVERITY_GT_IMPORTANT              | "match"
+        "break me"                        | EXCLUDE_SEVERITY_GT_IMPORTANT        | WITH_SEVERITY_GT_IMPORTANT              | "match"
         "Unscanned Image"                 | IMAGES_ARE_UNSCANNED                 | UNSCANNED                               | "match"
         "Volume Destination"              | NO_FOO_VOLUME_DESTINATIONS           | WITH_A_RW_FOO_VOLUME                    | "match"
         "Volume Name"                     | NO_FOO_VOLUME_NAME                   | WITH_A_RW_FOO_VOLUME                    | "match"
