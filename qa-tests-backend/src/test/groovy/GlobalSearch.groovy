@@ -112,7 +112,7 @@ class GlobalSearch extends BaseSpecification {
         "Image:docker.io/library/busybox:latest" | [SearchServiceOuterClass.SearchCategory.IMAGES] |
                 "docker.io/library/busybox:latest" | []
 
-        "Policy:Latest tag" | [SearchServiceOuterClass.SearchCategory.POLICIES] | "Latest tag" | []
+        "BreakMeAgain:Latest tag" | [SearchServiceOuterClass.SearchCategory.POLICIES] | "Latest tag" | []
 
         // This implicitly depends on the policy above triggering on the deployment created during this test.
         "Violation State:ACTIVE+Policy:Latest" | [SearchServiceOuterClass.SearchCategory.ALERTS] | "Latest" | []
