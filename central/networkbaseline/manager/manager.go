@@ -37,7 +37,7 @@ type Manager interface {
 	ProcessFlowUpdate(flows map[networkgraph.NetworkConnIndicator]timestamp.MicroTS) error
 	// ProcessPostClusterDelete is called during post cluster delete. It cleans up all the baselines that belonged to
 	// this cluster, including the edges pointing towards these baselines.
-	ProcessPostClusterDelete(clusterID string) error
+	ProcessPostClusterDelete(deploymentIDs []string) error
 
 	// ProcessBaselineStatusUpdate processes a user-filed request to modify the baseline status.
 	// The error it returns will be a status.Error.

@@ -741,7 +741,8 @@ func (suite *ManagerTestSuite) TestProcessPostClusterDelete() {
 			depPeer(1, properties(true, 443)),
 		),
 	)
-	suite.Nil(suite.m.ProcessPostClusterDelete(clusterID(10)))
+	deletedIDs := []string{depID(1), depID(2)}
+	suite.Nil(suite.m.ProcessPostClusterDelete(deletedIDs))
 	suite.assertBaselinesAre(
 		baselineWithClusterAndPeers(3, 11),
 		baselineWithClusterAndPeers(4, 12),

@@ -138,15 +138,15 @@ func (mr *MockManagerMockRecorder) ProcessNetworkPolicyUpdate(ctx, action, polic
 }
 
 // ProcessPostClusterDelete mocks base method.
-func (m *MockManager) ProcessPostClusterDelete(clusterID string) error {
+func (m *MockManager) ProcessPostClusterDelete(deploymentIDs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessPostClusterDelete", clusterID)
+	ret := m.ctrl.Call(m, "ProcessPostClusterDelete", deploymentIDs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ProcessPostClusterDelete indicates an expected call of ProcessPostClusterDelete.
-func (mr *MockManagerMockRecorder) ProcessPostClusterDelete(clusterID interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) ProcessPostClusterDelete(deploymentIDs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPostClusterDelete", reflect.TypeOf((*MockManager)(nil).ProcessPostClusterDelete), clusterID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPostClusterDelete", reflect.TypeOf((*MockManager)(nil).ProcessPostClusterDelete), deploymentIDs)
 }

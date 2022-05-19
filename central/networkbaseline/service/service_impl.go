@@ -81,7 +81,7 @@ func (s *serviceImpl) GetNetworkBaseline(
 	request *v1.ResourceByID,
 ) (*storage.NetworkBaseline, error) {
 	if request.GetId() == "" {
-		return nil, errors.Wrap(errox.InvalidArgs, "Network baseline id must be provided")
+		return nil, errors.Wrap(errox.InvalidArgs, "Deployment id for the network baseline must be provided")
 	}
 	baseline, found, err := s.datastore.GetNetworkBaseline(ctx, request.GetId())
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *serviceImpl) createBaseline(ctx context.Context, deploymentID string) (
 		return nil, err
 	}
 	if !found {
-		return nil, errors.Wrapf(errox.NotFound, "network baseline with id %q does not exist", deploymentID)
+		return nil, errors.Wrapf(errox.NotFound, "Network baseline for deployment id %q does not exist", deploymentID)
 	}
 
 	return baseline, nil

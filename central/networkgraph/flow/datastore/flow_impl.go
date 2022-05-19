@@ -57,7 +57,7 @@ func (fds *flowDataStoreImpl) GetMatchingFlows(ctx context.Context, pred func(*s
 func (fds *flowDataStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID string, adjustForGraph bool) ([]*storage.NetworkFlow, error) {
 	flows, err := fds.storage.GetFlowsForDeployment(ctx, deploymentID)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	if adjustForGraph {

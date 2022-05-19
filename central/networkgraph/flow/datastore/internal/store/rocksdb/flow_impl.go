@@ -67,7 +67,7 @@ func (s *flowStoreImpl) GetFlowsForDeployment(ctx context.Context, deploymentID 
 		dstEnt := props.GetDstEntity()
 
 		// Exclude all flows having both external endpoints. Although if one endpoint is an invisible external source,
-		// we still want to show the flow  given that the other endpoint is visible, however, attribute it to INTERNET.
+		// we still want to show the flow given that the other endpoint is visible, however, attribute it to INTERNET.
 		if networkgraph.AllExternal(srcEnt, dstEnt) {
 			return false
 		}
