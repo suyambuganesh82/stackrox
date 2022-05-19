@@ -387,9 +387,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.TestMultiKeyStr
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.TestMultiKeyStruct) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "TestMultiKeyStruct")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

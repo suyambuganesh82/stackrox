@@ -220,9 +220,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.TestGGrandChild
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.TestGGrandChild1) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "TestGGrandChild1")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

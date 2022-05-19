@@ -255,9 +255,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.CVE) error {
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.CVE) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "CVE")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

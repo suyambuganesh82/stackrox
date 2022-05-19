@@ -215,9 +215,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.ProcessBaseline
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.ProcessBaselineResults) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "ProcessBaselineResults")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

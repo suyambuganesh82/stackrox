@@ -366,9 +366,6 @@ func (s *storeImpl) Upsert(ctx context.Context, obj *{{.Type}}) error {
     }
     {{- end }}
 
-    s.mutex.Lock()
-    defer s.mutex.Unlock()
-
     return s.upsert(ctx, obj)
 }
 

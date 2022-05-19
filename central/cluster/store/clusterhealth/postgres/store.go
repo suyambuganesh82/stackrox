@@ -241,9 +241,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.ClusterHealthSt
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.ClusterHealthStatus) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "ClusterHealthStatus")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

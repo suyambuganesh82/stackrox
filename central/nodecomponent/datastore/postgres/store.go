@@ -240,9 +240,6 @@ func (s *storeImpl) upsert(ctx context.Context, objs ...*storage.ImageComponent)
 func (s *storeImpl) Upsert(ctx context.Context, obj *storage.ImageComponent) error {
 	defer metrics.SetPostgresOperationDurationTime(time.Now(), ops.Upsert, "ImageComponent")
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 

@@ -231,9 +231,6 @@ func (s *storeImpl) Upsert(ctx context.Context, obj *storage.Notifier) error {
 		return sac.ErrResourceAccessDenied
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.upsert(ctx, obj)
 }
 
