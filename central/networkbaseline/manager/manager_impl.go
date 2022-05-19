@@ -499,7 +499,7 @@ func (m *manager) processNetworkPolicyUpdate(
 	for _, deployment := range deployments {
 		baseline, found := m.baselinesByDeploymentID[deployment.GetId()]
 
-		if !found || baseline == nil {
+		if !found {
 			// Maybe somehow the network policy update came first before the deployment create event.
 			// In this case do nothing and trust that the deployment create flow should just
 			// take care of setting the observation period.  This could also occur if the deployment was
